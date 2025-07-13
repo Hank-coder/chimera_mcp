@@ -176,3 +176,5 @@ mcp_server.log
 
 # Notion cache
 .notion_cache/
+
+pyproject.toml

@@ -228,7 +228,7 @@ class ChimeraFastMCPServer:
                     message=f"搜索失败: {str(e)}"
                 )
     
-    def run(self, host: str = "127.0.0.1", port: int = 3000):
+    def run(self, host: str = "0.0.0.0", port: int = 3000):
         """启动Streamable HTTP MCP服务器"""
         logger.info(f"Starting Chimera FastMCP Server on http://{host}:{port}/mcp")
         
@@ -248,7 +248,7 @@ class ChimeraFastMCPServer:
 def main():
     """主入口函数"""
     parser = argparse.ArgumentParser(description="Chimera FastMCP HTTP Server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=3000, help="Port to bind to")
     parser.add_argument("--log-level", default="INFO", help="Log level")
     
