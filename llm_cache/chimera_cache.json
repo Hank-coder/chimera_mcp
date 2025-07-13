@@ -1,0 +1,432 @@
+{
+  "generated_at": "2025-07-13T11:56:36.147088",
+  "pages": {
+    "22eccc69-0d82-80cd-a9ac-ea1b8e307a69": {
+      "title": "FastMCP Bearer Token 认证机制\n",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T18:48:00.000000000+00:00",
+      "url": "https://www.notion.so/FastMCP-Bearer-Token-22eccc690d8280cda9acea1b8e307a69",
+      "level": 2,
+      "parent_id": null,
+      "children_ids": []
+    },
+    "22eccc69-0d82-800e-9432-de9522a4a99a": {
+      "title": "项目核心",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T18:19:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d82800e9432de9522a4a99a",
+      "level": 1,
+      "parent_id": null,
+      "children_ids": [
+        "22eccc69-0d82-80b9-acaf-f226e252e36e"
+      ]
+    },
+    "22eccc69-0d82-8045-bdee-c4cb511ff833": {
+      "title": "大模型 人工智能",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:40:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d828045bdeec4cb511ff833",
+      "level": 0,
+      "parent_id": null,
+      "children_ids": [
+        "22eccc69-0d82-80ba-a66e-e538199dbced",
+        "22eccc69-0d82-8090-a927-dcbc9c3d8ad7"
+      ]
+    },
+    "22eccc69-0d82-808b-aaa9-e785dc722202": {
+      "title": "Recommendation",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:38:00.000000000+00:00",
+      "url": "https://www.notion.so/Recommendation-22eccc690d82808baaa9e785dc722202",
+      "level": 2,
+      "parent_id": null,
+      "children_ids": []
+    },
+    "22eccc69-0d82-8030-be7a-e2f298d44098": {
+      "title": "战略方向",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:39:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d828030be7ae2f298d44098",
+      "level": 1,
+      "parent_id": null,
+      "children_ids": []
+    },
+    "22eccc69-0d82-80b9-acaf-f226e252e36e": {
+      "title": "NotionPage路径枚举算法总结\n",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T18:46:00.000000000+00:00",
+      "url": "https://www.notion.so/NotionPage-22eccc690d8280b9acaff226e252e36e",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-800e-9432-de9522a4a99a",
+      "children_ids": []
+    },
+    "22cccc69-0d82-8067-902f-c8a49dab1657": {
+      "title": "Green项目",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:39:00.000000000+00:00",
+      "url": "https://www.notion.so/Green-22cccc690d828067902fc8a49dab1657",
+      "level": 0,
+      "parent_id": null,
+      "children_ids": [
+        "22eccc69-0d82-8086-ba1c-feb9f760a43f",
+        "22eccc69-0d82-8077-a740-e2353005b8fe"
+      ]
+    },
+    "22dccc69-0d82-8084-ba31-db27e09e146d": {
+      "title": "Hank 陈宇函",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:40:00.000000000+00:00",
+      "url": "https://www.notion.so/Hank-22dccc690d828084ba31db27e09e146d",
+      "level": 0,
+      "parent_id": null,
+      "children_ids": [
+        "22dccc69-0d82-80d5-8f53-dec86d34943c"
+      ]
+    },
+    "22eccc69-0d82-80f4-8d4c-d82153bb7dc5": {
+      "title": "1: 深度学习基础 RNN 注意力机制 Transformer",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T14:05:00.000000000+00:00",
+      "url": "https://www.notion.so/1-RNN-Transformer-22eccc690d8280f48d4cd82153bb7dc5",
+      "level": 3,
+      "parent_id": null,
+      "children_ids": []
+    },
+    "22eccc69-0d82-8077-a740-e2353005b8fe": {
+      "title": "技术路径",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:38:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d828077a740e2353005b8fe",
+      "level": 1,
+      "parent_id": "22cccc69-0d82-8067-902f-c8a49dab1657",
+      "children_ids": []
+    },
+    "22eccc69-0d82-8086-ba1c-feb9f760a43f": {
+      "title": "算法思路",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:38:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d828086ba1cfeb9f760a43f",
+      "level": 1,
+      "parent_id": "22cccc69-0d82-8067-902f-c8a49dab1657",
+      "children_ids": [
+        "228ccc69-0d82-8090-ba89-ce4126f3d5d2"
+      ]
+    },
+    "22eccc69-0d82-80cb-93b8-c09591f177c0": {
+      "title": "系统自述 介绍",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T07:47:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d8280cb93b8c09591f177c0",
+      "level": 1,
+      "parent_id": "22eccc69-0d82-8048-86bc-cac59dd32145",
+      "children_ids": []
+    },
+    "22eccc69-0d82-80ba-a66e-e538199dbced": {
+      "title": "yann哥AI课程",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:32:00.000000000+00:00",
+      "url": "https://www.notion.so/yann-AI-22eccc690d8280baa66ee538199dbced",
+      "level": 1,
+      "parent_id": "22eccc69-0d82-8045-bdee-c4cb511ff833",
+      "children_ids": [
+        "22eccc69-0d82-8063-ae35-c9cc6f4b8cfa"
+      ]
+    },
+    "22eccc69-0d82-8048-86bc-cac59dd32145": {
+      "title": "Chimeara",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T07:47:00.000000000+00:00",
+      "url": "https://www.notion.so/Chimeara-22eccc690d82804886bccac59dd32145",
+      "level": 0,
+      "parent_id": null,
+      "children_ids": [
+        "22eccc69-0d82-80cb-93b8-c09591f177c0"
+      ]
+    },
+    "22eccc69-0d82-8063-ae35-c9cc6f4b8cfa": {
+      "title": "Prompt Context 工程",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:32:00.000000000+00:00",
+      "url": "https://www.notion.so/Prompt-Context-22eccc690d828063ae35c9cc6f4b8cfa",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-80ba-a66e-e538199dbced",
+      "children_ids": []
+    },
+    "228ccc69-0d82-8090-ba89-ce4126f3d5d2": {
+      "title": "Graphiti智能记忆层集成想法",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:38:00.000000000+00:00",
+      "url": "https://www.notion.so/Graphiti-228ccc690d828090ba89ce4126f3d5d2",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-8086-ba1c-feb9f760a43f",
+      "children_ids": []
+    },
+    "22dccc69-0d82-807b-9d39-c9de3011b0fc": {
+      "title": "UNSW课程",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T07:51:00.000000000+00:00",
+      "url": "https://www.notion.so/UNSW-22dccc690d82807b9d39c9de3011b0fc",
+      "level": 0,
+      "parent_id": null,
+      "children_ids": [
+        "22dccc69-0d82-80e4-8e28-cc45b8596548",
+        "22dccc69-0d82-80bd-bd52-c89ac9d86b25"
+      ]
+    },
+    "22eccc69-0d82-8090-a927-dcbc9c3d8ad7": {
+      "title": "迪哥AI课程",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T09:32:00.000000000+00:00",
+      "url": "https://www.notion.so/AI-22eccc690d828090a927dcbc9c3d8ad7",
+      "level": 1,
+      "parent_id": "22eccc69-0d82-8045-bdee-c4cb511ff833",
+      "children_ids": [
+        "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d"
+      ]
+    },
+    "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d": {
+      "title": "作业",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T08:55:00.000000000+00:00",
+      "url": "https://www.notion.so/22eccc690d8280a99a07ed5aa4e3de6d",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
+      "children_ids": []
+    },
+    "22dccc69-0d82-80bd-bd52-c89ac9d86b25": {
+      "title": "COMP9444",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T01:54:00.000000000+00:00",
+      "url": "https://www.notion.so/COMP9444-22dccc690d8280bdbd52c89ac9d86b25",
+      "level": 1,
+      "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+      "children_ids": []
+    },
+    "22dccc69-0d82-80e4-8e28-cc45b8596548": {
+      "title": "COMP9414",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-12T01:12:00.000000000+00:00",
+      "url": "https://www.notion.so/COMP9414-22dccc690d8280e48e28cc45b8596548",
+      "level": 1,
+      "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+      "children_ids": []
+    },
+    "22dccc69-0d82-80d5-8f53-dec86d34943c": {
+      "title": "简历",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-11T01:18:00.000000000+00:00",
+      "url": "https://www.notion.so/22dccc690d8280d58f53dec86d34943c",
+      "level": 1,
+      "parent_id": "22dccc69-0d82-8084-ba31-db27e09e146d",
+      "children_ids": []
+    }
+  },
+  "paths": [
+    {
+      "path_string": "FastMCP Bearer Token 认证机制\n",
+      "path_titles": [
+        "FastMCP Bearer Token 认证机制\n"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-80cd-a9ac-ea1b8e307a69"
+      ],
+      "leaf_id": "22eccc69-0d82-80cd-a9ac-ea1b8e307a69",
+      "leaf_title": "FastMCP Bearer Token 认证机制\n",
+      "path_length": 0
+    },
+    {
+      "path_string": "Recommendation",
+      "path_titles": [
+        "Recommendation"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-808b-aaa9-e785dc722202"
+      ],
+      "leaf_id": "22eccc69-0d82-808b-aaa9-e785dc722202",
+      "leaf_title": "Recommendation",
+      "path_length": 0
+    },
+    {
+      "path_string": "战略方向",
+      "path_titles": [
+        "战略方向"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8030-be7a-e2f298d44098"
+      ],
+      "leaf_id": "22eccc69-0d82-8030-be7a-e2f298d44098",
+      "leaf_title": "战略方向",
+      "path_length": 0
+    },
+    {
+      "path_string": "项目核心 -> NotionPage路径枚举算法总结\n",
+      "path_titles": [
+        "项目核心",
+        "NotionPage路径枚举算法总结\n"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-800e-9432-de9522a4a99a",
+        "22eccc69-0d82-80b9-acaf-f226e252e36e"
+      ],
+      "leaf_id": "22eccc69-0d82-80b9-acaf-f226e252e36e",
+      "leaf_title": "NotionPage路径枚举算法总结\n",
+      "path_length": 1
+    },
+    {
+      "path_string": "1: 深度学习基础 RNN 注意力机制 Transformer",
+      "path_titles": [
+        "1: 深度学习基础 RNN 注意力机制 Transformer"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-80f4-8d4c-d82153bb7dc5"
+      ],
+      "leaf_id": "22eccc69-0d82-80f4-8d4c-d82153bb7dc5",
+      "leaf_title": "1: 深度学习基础 RNN 注意力机制 Transformer",
+      "path_length": 0
+    },
+    {
+      "path_string": "Green项目 -> 技术路径",
+      "path_titles": [
+        "Green项目",
+        "技术路径"
+      ],
+      "path_ids": [
+        "22cccc69-0d82-8067-902f-c8a49dab1657",
+        "22eccc69-0d82-8077-a740-e2353005b8fe"
+      ],
+      "leaf_id": "22eccc69-0d82-8077-a740-e2353005b8fe",
+      "leaf_title": "技术路径",
+      "path_length": 1
+    },
+    {
+      "path_string": "Chimeara -> 系统自述 介绍",
+      "path_titles": [
+        "Chimeara",
+        "系统自述 介绍"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
+        "22eccc69-0d82-80cb-93b8-c09591f177c0"
+      ],
+      "leaf_id": "22eccc69-0d82-80cb-93b8-c09591f177c0",
+      "leaf_title": "系统自述 介绍",
+      "path_length": 1
+    },
+    {
+      "path_string": "大模型 人工智能 -> yann哥AI课程 -> Prompt Context 工程",
+      "path_titles": [
+        "大模型 人工智能",
+        "yann哥AI课程",
+        "Prompt Context 工程"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8045-bdee-c4cb511ff833",
+        "22eccc69-0d82-80ba-a66e-e538199dbced",
+        "22eccc69-0d82-8063-ae35-c9cc6f4b8cfa"
+      ],
+      "leaf_id": "22eccc69-0d82-8063-ae35-c9cc6f4b8cfa",
+      "leaf_title": "Prompt Context 工程",
+      "path_length": 2
+    },
+    {
+      "path_string": "Green项目 -> 算法思路 -> Graphiti智能记忆层集成想法",
+      "path_titles": [
+        "Green项目",
+        "算法思路",
+        "Graphiti智能记忆层集成想法"
+      ],
+      "path_ids": [
+        "22cccc69-0d82-8067-902f-c8a49dab1657",
+        "22eccc69-0d82-8086-ba1c-feb9f760a43f",
+        "228ccc69-0d82-8090-ba89-ce4126f3d5d2"
+      ],
+      "leaf_id": "228ccc69-0d82-8090-ba89-ce4126f3d5d2",
+      "leaf_title": "Graphiti智能记忆层集成想法",
+      "path_length": 2
+    },
+    {
+      "path_string": "大模型 人工智能 -> 迪哥AI课程 -> 作业",
+      "path_titles": [
+        "大模型 人工智能",
+        "迪哥AI课程",
+        "作业"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8045-bdee-c4cb511ff833",
+        "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
+        "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d"
+      ],
+      "leaf_id": "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d",
+      "leaf_title": "作业",
+      "path_length": 2
+    },
+    {
+      "path_string": "UNSW课程 -> COMP9444",
+      "path_titles": [
+        "UNSW课程",
+        "COMP9444"
+      ],
+      "path_ids": [
+        "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+        "22dccc69-0d82-80bd-bd52-c89ac9d86b25"
+      ],
+      "leaf_id": "22dccc69-0d82-80bd-bd52-c89ac9d86b25",
+      "leaf_title": "COMP9444",
+      "path_length": 1
+    },
+    {
+      "path_string": "UNSW课程 -> COMP9414",
+      "path_titles": [
+        "UNSW课程",
+        "COMP9414"
+      ],
+      "path_ids": [
+        "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+        "22dccc69-0d82-80e4-8e28-cc45b8596548"
+      ],
+      "leaf_id": "22dccc69-0d82-80e4-8e28-cc45b8596548",
+      "leaf_title": "COMP9414",
+      "path_length": 1
+    },
+    {
+      "path_string": "Hank 陈宇函 -> 简历",
+      "path_titles": [
+        "Hank 陈宇函",
+        "简历"
+      ],
+      "path_ids": [
+        "22dccc69-0d82-8084-ba31-db27e09e146d",
+        "22dccc69-0d82-80d5-8f53-dec86d34943c"
+      ],
+      "leaf_id": "22dccc69-0d82-80d5-8f53-dec86d34943c",
+      "leaf_title": "简历",
+      "path_length": 1
+    }
+  ],
+  "metadata": {
+    "total_pages": 22,
+    "total_paths": 13
+  }
+}
