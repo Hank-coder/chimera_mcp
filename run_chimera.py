@@ -153,14 +153,17 @@ async def generate_cache():
 
 
 async def run_continuous_sync():
-    """运行持续的15分钟同步监测"""
-    logger.info("🔄 启动15分钟同步监测服务...")
+    """运行持续的同步监测"""
+    settings = get_settings()
+    sync_interval = settings.sync_interval_minutes
+    
+    logger.info(f"🔄 启动{sync_interval}分钟同步监测服务...")
     
     sync_service = SyncService()
     
     try:
         await sync_service.initialize()
-        logger.info("✅ 同步服务已启动，每15分钟检查更新")
+        logger.info(f"✅ 同步服务已启动，每{sync_interval}分钟检查更新")
         
         while True:
             try:
@@ -174,9 +177,9 @@ async def run_continuous_sync():
                 else:
                     logger.warning("⚠️ 同步检查发现问题")
                 
-                # 等待15分钟
-                logger.info("⏳ 等待15分钟后进行下次检查...")
-                await asyncio.sleep(15 * 60)  # 15分钟
+                # 等待配置的时间间隔
+                logger.info(f"⏳ 等待{sync_interval}分钟后进行下次检查...")
+                await asyncio.sleep(sync_interval * 60)
                     
             except Exception as e:
                 logger.exception(f"❌ 同步监测异常: {e}")
