@@ -1,282 +1,173 @@
-# Personal AI Memory System (Project Chimera)
+# Project Chimera
 
-个人AI记忆核心 - 一个与您共生的、可进化的个人认知中枢。
+🧠 **个人AI记忆系统** - 让AI成为真正懂你的"第二大脑"
 
-## 🎯 项目愿景
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![UV](https://img.shields.io/badge/uv-latest-green.svg)](https://github.com/astral-sh/uv)
+[![Neo4j](https://img.shields.io/badge/neo4j-5.x-red.svg)](https://neo4j.com/)
+[![MCP](https://img.shields.io/badge/protocol-MCP-orange.svg)](https://modelcontextprotocol.io/)
 
-打造一个与我共生的、可进化的个人认知中枢。它不仅是过去记忆的存储器，更是未来创造的加速器，让 AI 成为真正懂我、助我成长的"第二大脑"。
+## ✨ 特性
 
-## 🏗 系统架构
-
-### 核心设计原则
-
-- **图谱即索引 (Graph as Index)**: Notion 是唯一的事实源头和内容载体；图数据库是其上的一层智能关系网络
-- **不重复原则 (No Duplication)**: 严格遵守数据极简，图数据库不存储Notion页面正文，仅存储关系和元数据
-- **用户无感 (Seamless Experience)**: 所有后台同步和索引工作对用户透明
-
-### 双服务架构
-
-1. **后台同步服务 (The Archivist - 档案保管员)**
-   - 独立、低频运行的进程
-   - 忠实地读取Notion，并使用Graphiti根据数据模型更新Neo4j图谱索引
-
-2. **MCP检索服务 (The Navigator - 导航员)**
-   - 轻量、快速、无状态的服务
-   - 响应LLM的请求，在图谱中快速搜索，并返回notionId列表
-
-## 🔧 技术栈
-
-- **语言**: Python 3.11+
-- **包管理**: UV
-- **图数据库**: Neo4j
-- **图操作**: Graphiti
-- **内容源**: Notion API
-- **嵌入模型**: Google Gemini
-- **API协议**: MCP (Model Context Protocol)
-- **数据验证**: Pydantic
-- **日志**: Loguru
+- 🔗 **智能关系图谱**: 自动构建Notion页面间的语义关系网络
+- 🚀 **MCP协议支持**: 与Claude Desktop等AI客户端无缝集成
+- 🔍 **意图搜索**: 基于自然语言理解的智能内容检索
+- ⚡ **实时同步**: 自动监测Notion变更并增量更新图谱
+- 🛡️ **数据安全**: 图数据库仅存储关系和元数据，内容从Notion实时获取
 
 ## 🚀 快速开始
 
-### 1. 环境安装
+### 环境要求
+
+- Python 3.11+
+- Neo4j 数据库
+- Notion API Token
+- Google Gemini API Key
+
+### 安装
 
 ```bash
-# 克隆项目
-git clone <your-repo-url>
-cd personal-ai-memory
+# 克隆仓库
+git clone https://github.com/your-username/Chimera.git
+cd Chimera
 
-# 使用UV安装依赖
+# 使用 uv 安装依赖（推荐）
 uv sync
 
-# 复制环境配置
+# 或使用 pip
+pip install -r requirements.txt
+```
+
+### 配置
+
+1. 复制环境变量模板：
+```bash
 cp .env.example .env
 ```
 
-### 2. 配置环境变量
-
-编辑 `.env` 文件，配置以下关键信息：
-
+2. 编辑 `.env` 文件，填入你的配置：
 ```bash
 # Neo4j 配置
-NEO4J_URI=neo4j://127.0.0.1:7687
+NEO4J_URI=neo4j://your-neo4j-server:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your_neo4j_password_here
+NEO4J_PASSWORD=your_password
 
-# Notion 配置
-NOTION_TOKEN=your_notion_integration_token_here
+# Notion API
+NOTION_TOKEN=your_notion_integration_token
 
-# Gemini 配置
-GEMINI_API_KEY=your_gemini_api_key_here
+# Google Gemini
+GEMINI_API_KEY=your_gemini_api_key
+
+# MCP 服务器
+CHIMERA_API_KEY=your_api_key
 ```
 
-### 3. 初始化数据库
+### 使用方法
+
+#### 启动服务 具体见 server_config.md
 
 ```bash
-# 设置数据库约束和索引
-python scripts/setup_database.py
+# 启动 MCP 服务器
+uv run fastmcp_server.py --host 0.0.0.0 --port 3000
 
-# 验证数据库连接
-python scripts/setup_database.py --test
+# 启动同步服务
+uv run run_chimera.py
 ```
 
-### 4. 运行健康检查
+#### 后台运行
 
 ```bash
-# 全面健康检查
-python scripts/health_check.py
+# 后台启动服务
+nohup uv run fastmcp_server.py --host 0.0.0.0 --port 3000 > mcp_server.log 2>&1 &
+nohup uv run run_chimera.py > sync_service.log 2>&1 &
 
-# 检查特定组件
-python scripts/health_check.py --check notion
-python scripts/health_check.py --check neo4j
+# 检查状态
+ps aux | grep fastmcp_server
+ps aux | grep run_chimera
+
+# 停止服务
+pkill -f fastmcp_server
+pkill -f run_chimera
 ```
 
-### 5. 启动服务
+#### Claude Desktop 集成
 
-#### 同步服务 (The Archivist)
-```bash
-# 手动同步
-python scripts/manual_sync.py
+在 `claude_desktop_config.json` 中添加：
 
-# 全量同步
-python scripts/manual_sync.py --full
-
-# 启动后台同步服务
-python -m sync_service.main
-```
-
-#### MCP服务 (The Navigator)
-```bash
-# 启动MCP服务器
-python -m mcp_server.server
-```
-
-## 🛠 核心功能
-
-### MCP工具
-
-#### 1. search(query, limit=10)
-语义搜索您的Notion知识库
 ```json
 {
-    "query": "搜索查询",
-    "limit": 10
+  "mcpServers": {
+    "chimera-memory": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://your-server:3000/mcp/",
+        "--header",
+        "Authorization:Bearer your_api_key",
+        "--allow-http"
+      ]
+    }
+  }
 }
 ```
 
-#### 2. expand(page_ids, depth=1, relation_types=null)
-从给定页面扩展找到相关页面
-```json
-{
-    "page_ids": ["page-id-1", "page-id-2"],
-    "depth": 2,
-    "relation_types": ["LINKS_TO", "MENTIONS"]
-}
+## 📁 项目结构
+
+```
+Chimera/
+├── config/           # 配置管理
+├── core/            # 核心业务逻辑和数据模型
+├── sync_service/    # 后台同步服务
+├── agents/          # 意图搜索和AI代理
+├── prompts/         # LLM提示词模板
+├── utils/           # 工具函数
+├── scripts/         # 部署和维护脚本
+└── tests/           # 测试套件
 ```
 
-#### 3. get_content(page_ids, include_metadata=true)
-获取页面完整内容
-```json
-{
-    "page_ids": ["page-id-1", "page-id-2"],
-    "include_metadata": true
-}
-```
+## 🔧 配置说明
 
-## 📊 核心查询工作流
+主要环境变量：
 
-1. **查询发起**: 用户向集成了本系统的AI应用提问
-2. **关系导航**: MCP检索服务在图数据库中通过语义搜索和关系遍历找到相关页面
-3. **返回ID列表**: MCP服务返回排序后的notionId列表
-4. **内容获取**: AI应用通过Notion API实时获取页面原文
-5. **上下文构建**: 组合"关系摘要"和"页面原文"
-6. **生成回答**: LLM基于丰富上下文生成精准回答
+| 变量名 | 描述 | 默认值 |
+|--------|------|--------|
+| `SYNC_INTERVAL_MINUTES` | 同步频率（分钟） | 30 |
+| `NEO4J_URI` | Neo4j连接字符串 | neo4j://127.0.0.1:7687 |
+| `NOTION_TOKEN` | Notion API令牌 | 必填 |
+| `GEMINI_API_KEY` | Google Gemini API密钥 | 必填 |
+| `MCP_SERVER_PORT` | MCP服务器端口 | 3000 |
 
-## 🔄 同步机制
+## 📊 工作原理
 
-### 增量同步
-- 基于 `last_edited_time` 检测变化
-- 批量处理，避免API限制
-- 智能重试机制
+1. **数据同步**: 监控Notion变更并提取页面关系
+2. **图谱构建**: 在Neo4j中创建带嵌入向量的语义图谱
+3. **意图搜索**: 处理自然语言查询，找到相关内容
+4. **MCP接口**: 通过Model Context Protocol为AI客户端提供服务
 
-### 关系提取
-- 自动检测 `[[内部链接]]`
-- 解析 `@提及`
-- 处理数据库关系属性
-- 提取和聚类标签
+## 🤝 贡献
 
-## 📈 监控和维护
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交你的修改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 打开一个 Pull Request
 
-### 健康检查
-```bash
-# 全面检查
-python scripts/health_check.py
+## 📝 文档
 
-# JSON格式输出
-python scripts/health_check.py --json
-
-# 特定检查
-python scripts/health_check.py --check integrity
-```
-
-### 同步状态
-```bash
-# 查看同步统计
-python scripts/manual_sync.py --stats
-
-# 测试组件
-python scripts/manual_sync.py --test
-```
-
-### 日志管理
-- 日志文件: `logs/chimera.log`
-- 错误日志: `logs/chimera_errors.log`
-- 自动轮转和压缩
-- JSON格式便于分析
-
-## 🔍 故障排除
-
-### 常见问题
-
-1. **Neo4j连接失败**
-   ```bash
-   # 检查Neo4j服务状态
-   python scripts/health_check.py --check neo4j
-   
-   # 验证配置
-   python scripts/setup_database.py --test
-   ```
-
-2. **Notion API权限错误**
-   ```bash
-   # 检查API权限
-   python scripts/health_check.py --check notion
-   ```
-
-3. **嵌入服务不可用**
-   ```bash
-   # 检查Gemini API
-   python scripts/health_check.py --check embedding
-   ```
-
-## 🤝 开发指南
-
-### 代码规范
-- 使用 `black` 格式化代码
-- 使用 `ruff` 进行代码检查
-- 使用 `mypy` 进行类型检查
-
-```bash
-# 代码格式化
-uv run black .
-
-# 代码检查
-uv run ruff check .
-
-# 类型检查
-uv run mypy .
-```
-
-### 测试
-```bash
-# 运行测试
-uv run pytest
-
-# 带覆盖率
-uv run pytest --cov=.
-
-# 运行完整测试套件
-python scripts/run_tests.py
-```
-
-## 📝 版本历史
-
-### v0.1.0 (当前版本)
-- ✅ 完整的双服务架构
-- ✅ Notion API集成
-- ✅ Neo4j + Graphiti图操作
-- ✅ Gemini嵌入服务
-- ✅ MCP协议支持
-- ✅ 自动同步机制
-- ✅ 健康检查和监控
-
-## 🎯 未来规划
-
-- [ ] Web界面管理
-- [ ] 更多LLM模型支持
-- [ ] 高级分析和可视化
-- [ ] 插件系统
-- [ ] 多用户支持
+- [服务器配置指南](server_config.md) - 完整的部署配置
+- [开发指南](docs/DEVELOPMENT_GUIDE.md) - 详细的开发说明
 
 ## 📄 许可证
 
-MIT License
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🙏 致谢
 
-- [Graphiti](https://github.com/getzep/graphiti) - 强大的图数据库操作框架
-- [Notion API](https://developers.notion.com/) - 优秀的内容管理平台
-- [Google Gemini](https://ai.google.dev/) - 高质量的嵌入模型
+- [Graphiti](https://github.com/getzep/graphiti) - 图数据库操作框架
+- [FastMCP](https://github.com/jlowin/fastmcp) - MCP服务器框架
+- [Notion API](https://developers.notion.com/) - 内容管理平台
+- [Google Gemini](https://ai.google.dev/) - LLM模型
 
 ---
 
-**Project Chimera** - 让AI真正理解您的知识，成为您思维的延伸。
+⭐ **如果这个项目对你有帮助，请给个Star！**

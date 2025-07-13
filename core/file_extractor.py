@@ -160,7 +160,14 @@ class FileContentExtractor:
     
     async def _download_file(self, url: str) -> Tuple[bytes, Dict[str, Any]]:
         """下载文件并返回内容和元数据"""
-        async with aiohttp.ClientSession() as session:
+        # 配置SSL设置，解决证书验证问题
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as response:
                 response.raise_for_status()
                 
