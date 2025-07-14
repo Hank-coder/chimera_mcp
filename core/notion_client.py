@@ -203,8 +203,133 @@ class NotionExtractor:
         elif block_type == "code":
             rich_text = block.get("code", {}).get("rich_text", [])
             text_content = "".join([item.get("plain_text", "") for item in rich_text])
+        elif block_type == "table":
+            # Handle table blocks - extract content from table rows
+            text_content = self._extract_table_content(block)
+        elif block_type == "table_row":
+            # Handle table row blocks - extract content from cells
+            text_content = self._extract_table_row_content(block)
         
         return text_content
+    
+    def _extract_table_content(self, block: Dict[str, Any]) -> str:
+        """
+        Extract text content from a table block.
+        
+        Args:
+            block: Notion table block object
+            
+        Returns:
+            Formatted table content as string
+        """
+        try:
+            table_data = block.get("table", {})
+            table_width = table_data.get("table_width", 0)
+            
+            # Note: For paginated table content, we need to fetch table rows separately
+            # This is a simplified version that handles immediate children
+            children = table_data.get("children", [])
+            
+            if not children:
+                return f"[Table with {table_width} columns - content needs separate fetch]"
+            
+            table_rows = []
+            for child in children:
+                if child.get("type") == "table_row":
+                    row_content = self._extract_table_row_content(child)
+                    if row_content:
+                        table_rows.append(row_content)
+            
+            if table_rows:
+                return "\n".join(table_rows)
+            else:
+                return f"[Table with {table_width} columns]"
+                
+        except Exception as e:
+            logger.warning(f"Error extracting table content: {e}")
+            return "[Table - extraction failed]"
+    
+    def _extract_table_row_content(self, block: Dict[str, Any]) -> str:
+        """
+        Extract text content from a table row block.
+        
+        Args:
+            block: Notion table_row block object
+            
+        Returns:
+            Row content as tab-separated string
+        """
+        try:
+            table_row = block.get("table_row", {})
+            cells = table_row.get("cells", [])
+            
+            cell_texts = []
+            for cell in cells:
+                # Each cell is an array of rich text objects
+                cell_text = ""
+                for text_obj in cell:
+                    if text_obj.get("type") == "text":
+                        cell_text += text_obj.get("text", {}).get("content", "")
+                    elif "plain_text" in text_obj:
+                        cell_text += text_obj.get("plain_text", "")
+                
+                cell_texts.append(cell_text.strip())
+            
+            return " | ".join(cell_texts)
+            
+        except Exception as e:
+            logger.warning(f"Error extracting table row content: {e}")
+            return "[Table row - extraction failed]"
+    
+    async def _extract_text_from_block_recursive(self, block: Dict[str, Any]) -> str:
+        """
+        Extract text from a block recursively, handling child blocks like table rows.
+        
+        Args:
+            block: Notion block object
+            
+        Returns:
+            Text content including children
+        """
+        try:
+            # Extract text from current block
+            text_content = self._extract_text_from_block(block)
+            
+            # Handle blocks that need child fetching
+            block_type = block.get("type", "")
+            
+            if block_type == "table":
+                # For table blocks, we need to fetch the table rows separately
+                await self._rate_limit_wait()
+                table_id = block.get("id")
+                
+                if table_id:
+                    try:
+                        table_rows = await async_collect_paginated_api(
+                            self.client.blocks.children.list,
+                            block_id=table_id
+                        )
+                        
+                        row_texts = []
+                        for row in table_rows:
+                            if row.get("type") == "table_row":
+                                row_text = self._extract_table_row_content(row)
+                                if row_text:
+                                    row_texts.append(row_text)
+                        
+                        if row_texts:
+                            return "\n".join(row_texts)
+                        else:
+                            return text_content  # Fallback to original content
+                    except Exception as e:
+                        logger.warning(f"Error fetching table rows for block {table_id}: {e}")
+                        return text_content  # Fallback to original content
+            
+            return text_content
+            
+        except Exception as e:
+            logger.warning(f"Error extracting text from block recursively: {e}")
+            return self._extract_text_from_block(block)  # Fallback to non-recursive
     
     def _extract_database_relations(self, page: Dict[str, Any]) -> List[str]:
         """
@@ -280,14 +405,20 @@ class NotionExtractor:
             
             content_parts = []
             for block in blocks:
-                text = self._extract_text_from_block(block)
+                text = await self._extract_text_from_block_recursive(block)
                 if text:
                     content_parts.append(text)
             
             return "\n\n".join(content_parts)
             
         except Exception as e:
-            logger.error(f"Error getting content for page {page_id}: {e}")
+            error_msg = str(e)
+            if "Could not find block with ID" in error_msg:
+                logger.warning(f"Page {page_id} not found or not accessible: {e}")
+            elif "Make sure the relevant pages and databases are shared" in error_msg:
+                logger.warning(f"Permission error for page {page_id}: {e}")
+            else:
+                logger.error(f"Error getting content for page {page_id}: {e}")
             return None
     
     async def get_page_content_with_files(self, page_id: str) -> Optional[str]:
@@ -309,8 +440,8 @@ class NotionExtractor:
             
             content_parts = []
             for block in blocks:
-                # 处理文本内容
-                text = self._extract_text_from_block(block)
+                # 处理文本内容 (包括table)
+                text = await self._extract_text_from_block_recursive(block)
                 if text:
                     content_parts.append(text)
                 
@@ -323,7 +454,13 @@ class NotionExtractor:
             return "\n\n".join(content_parts)
             
         except Exception as e:
-            logger.error(f"Error getting content with files for page {page_id}: {e}")
+            error_msg = str(e)
+            if "Could not find block with ID" in error_msg:
+                logger.warning(f"Page {page_id} not found or not accessible: {e}")
+            elif "Make sure the relevant pages and databases are shared" in error_msg:
+                logger.warning(f"Permission error for page {page_id}: {e}")
+            else:
+                logger.error(f"Error getting content with files for page {page_id}: {e}")
             return None
     
     async def _extract_file_block_content(self, block: Dict[str, Any]) -> Optional[str]:
@@ -523,12 +660,23 @@ class NotionClient:
         Returns:
             规范化的UUID格式页面ID
         """
+        # 如果已经是UUID格式，直接返回
+        if len(page_id) == 36 and page_id.count('-') == 4:
+            return page_id
+        
         # 移除所有连字符
         clean_id = page_id.replace("-", "")
         
         # 如果长度不是32位，返回原ID（可能是非标准格式）
         if len(clean_id) != 32:
             logger.warning(f"页面ID长度异常: {len(clean_id)} (期望32位) - {page_id}")
+            return page_id
+        
+        # 验证是否为有效的十六进制字符
+        try:
+            int(clean_id, 16)
+        except ValueError:
+            logger.warning(f"页面ID包含无效字符: {page_id}")
             return page_id
         
         # 转换为UUID格式: 8-4-4-4-12
@@ -547,6 +695,7 @@ class NotionClient:
         try:
             # 规范化页面ID
             normalized_id = self._normalize_page_id(page_id)
+            logger.debug(f"Getting content for page: {page_id} -> {normalized_id}")
             
             if include_files:
                 content = await self.extractor.get_page_content_with_files(normalized_id)
@@ -563,11 +712,17 @@ class NotionClient:
                 return content
             else:
                 # 页面存在但内容为空
-                page_info = await self.extractor.get_page_basic_info(page_id)
+                page_info = await self.extractor.get_page_basic_info(normalized_id)
                 page_title = page_info.get('title', 'Unknown') if page_info else 'Unknown'
                 return f"页面 '{page_title}' 当前没有内容，这可能是一个空白页面或仅包含标题的页面。"
         except Exception as e:
-            return f"无法获取页面内容: {str(e)}"
+            error_msg = str(e)
+            if "Could not find block with ID" in error_msg:
+                return f"无法访问页面 {page_id}: 页面不存在或未授权访问。请确保：\n1. 页面ID正确\n2. 页面已与Notion integration分享\n3. 检查页面权限设置"
+            elif "Make sure the relevant pages and databases are shared" in error_msg:
+                return f"权限错误: 页面 {page_id} 未与integration分享。请在Notion中将此页面分享给你的integration。"
+            else:
+                return f"无法获取页面内容: {error_msg}"
     
     def _truncate_page_content(self, content: str, max_length: int) -> str:
         """
@@ -614,14 +769,10 @@ class NotionClient:
         
         return result
     
-    async def get_page_info(self, page_id: str) -> Dict[str, Any]:
+    async def get_page_info(self, page_id: str) -> Optional[Dict[str, Any]]:
         """获取页面基本信息"""
         # 规范化页面ID
         normalized_id = self._normalize_page_id(page_id)
         
         info = await self.extractor.get_page_basic_info(normalized_id)
-        return info or {
-            'title': f'页面 {page_id}',
-            'url': '',
-            'tags': []
-        }
+        return info  # 如果页面不存在就返回None，不要返回假信息

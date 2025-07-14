@@ -86,20 +86,40 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
                     "content_length": len(content)
                 })
             except Exception as e:
-                path_contents.append({
-                    "position": i,
-                    "title": title,
-                    "notion_id": page_id,
-                    "content": f"获取内容失败: {str(e)}",
-                    "has_files": False,
-                    "content_length": 0
-                })
+                error_msg = str(e)
+                
+                # 页面获取失败，返回友好错误信息
+                if ("Could not find block with ID" in error_msg or 
+                    "Make sure the relevant pages and databases are shared" in error_msg or
+                    "页面不存在或未授权访问" in error_msg):
+                    
+                    logger.warning(f"页面 {page_id} 无法访问: {error_msg}")
+                    
+                    path_contents.append({
+                        "position": i,
+                        "title": title,
+                        "notion_id": page_id,
+                        "content": f"⚠️ 页面无法访问: {title}\n原因: 页面已删除或权限不足",
+                        "has_files": False,
+                        "content_length": 0,
+                        "status": "inaccessible"
+                    })
+                else:
+                    # 其他错误
+                    path_contents.append({
+                        "position": i,
+                        "title": title,
+                        "notion_id": page_id,
+                        "content": f"获取内容失败: {error_msg}",
+                        "has_files": False,
+                        "content_length": 0,
+                        "status": "error"
+                    })
     finally:
         # 恢复原始设置
         file_extractor.max_content_length = original_max_length
     
     return path_contents
-
 
 
 def truncate_content_smart(content: str, max_length: int) -> str:

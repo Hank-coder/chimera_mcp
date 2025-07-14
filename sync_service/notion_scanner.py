@@ -38,7 +38,7 @@ class NotionScanner:
             with LogExecutionTime("notion_scan"):
                 # Get all pages metadata
                 pages = await self.notion_client.get_all_pages_metadata(last_sync_time)
-                
+                # print(pages)
                 # Filter out pages we've already processed in this session
                 new_pages = []
                 for page in pages:

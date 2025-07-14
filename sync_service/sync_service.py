@@ -36,6 +36,7 @@ class SyncService:
         self.scanner = None
         self.updater = None
         self.scheduler = None
+        self._last_full_sync_time = None
         
     async def initialize(self):
         """Initialize all components of the sync service."""
@@ -69,6 +70,11 @@ class SyncService:
     async def run_sync_cycle(self) -> bool:
         """
         Run a complete sync cycle.
+        决定执行全量同步或增量同步的策略：
+        - 首次运行：全量同步
+        - 距离上次全量同步超过3天：全量同步
+        - 北京时间凌晨4点定时全量同步（距离上次全量同步超过1天）
+        - 其他情况：增量同步
         
         Returns:
             True if sync was successful, False otherwise
@@ -82,33 +88,29 @@ class SyncService:
                     logger.error("Health check failed, skipping sync cycle")
                     return False
                 
-                # Get last sync time (but use None if scanner was reset)
-                if self.scanner._last_scan_time is None:
-                    last_sync_time = None  # Force full sync
-                    logger.info("Scanner was reset, performing full sync")
+                # 判断是否需要全量同步
+                should_do_full_sync = await self._should_do_full_sync()
+                
+                if should_do_full_sync:
+                    logger.info("🔄 执行全量同步 (首次运行或距离上次全量同步超过72小时)")
+                    success = await self._run_full_sync()
                 else:
-                    last_sync_time = await self._get_last_sync_time()
+                    logger.info("⚡ 执行增量同步")
+                    success = await self._run_incremental_sync()
                 
-                # Scan for changed pages
-                changed_pages = await self.scanner.scan_for_changes(last_sync_time)
+                if success:
+                    # Update last sync time
+                    await self._update_last_sync_time()
+                    
+                    # 如果是全量同步，更新全量同步时间
+                    if should_do_full_sync:
+                        await self._update_last_full_sync_time()
+                    
+                    logger.info("Sync cycle completed successfully")
+                else:
+                    logger.error("Sync cycle failed")
                 
-                if not changed_pages:
-                    logger.info("No changes detected, sync cycle complete")
-                    return True
-                
-                logger.info(f"Found {len(changed_pages)} pages to sync")
-                
-                # Update graph with changes
-                sync_report = await self.updater.update_graph(changed_pages)
-                
-                # Log sync results
-                self._log_sync_results(sync_report)
-                
-                # Update last sync time
-                await self._update_last_sync_time()
-                
-                logger.info("Sync cycle completed successfully")
-                return True
+                return success
                 
         except Exception as e:
             logger.exception(f"Sync cycle failed: {e}")
@@ -167,6 +169,193 @@ class SyncService:
             
         except Exception as e:
             logger.warning(f"Could not update last sync time: {e}")
+    
+    async def _get_last_full_sync_time(self) -> Optional[datetime]:
+        """Get the last full sync time from the graph database."""
+        try:
+            query = """
+            MATCH (meta:SyncMetadata {id: 'main'})
+            RETURN meta.last_full_sync_time as last_full_sync_time
+            """
+            
+            async with self.graph_client._driver.session() as session:
+                result = await session.run(query)
+                record = await result.single()
+                if record and record["last_full_sync_time"]:
+                    return record["last_full_sync_time"]
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Could not get last full sync time: {e}")
+            return None
+    
+    async def _update_last_full_sync_time(self):
+        """Update the last full sync time in the graph database."""
+        try:
+            query = """
+            MERGE (meta:SyncMetadata {id: 'main'})
+            SET meta.last_full_sync_time = datetime()
+            """
+            
+            async with self.graph_client._driver.session() as session:
+                await session.run(query)
+            
+        except Exception as e:
+            logger.warning(f"Could not update last full sync time: {e}")
+    
+    async def _should_do_full_sync(self) -> bool:
+        """判断是否应该执行全量同步"""
+        # 检查是否为首次运行程序（检查Neo4j中是否有任何NotionPage）
+        is_first_run = await self._is_first_run()
+        if is_first_run:
+            logger.info("🆕 首次运行程序，Neo4j中没有任何页面数据，执行全量同步")
+            return True
+        
+        # 获取上次全量同步时间
+        last_full_sync = await self._get_last_full_sync_time()
+        
+        if last_full_sync is None:
+            logger.info("🆕 没有全量同步记录，需要全量同步")
+            return True
+        
+        # 检查是否超过12小时 (处理Neo4j DateTime类型和时区问题)
+        if hasattr(last_full_sync, 'to_native'):
+            # Neo4j DateTime转换为Python datetime
+            last_full_sync_native = last_full_sync.to_native()
+        else:
+            last_full_sync_native = last_full_sync
+        
+        # 确保两个datetime对象具有相同的时区信息
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        if last_full_sync_native.tzinfo is None:
+            # 如果数据库时间没有时区，假设是UTC
+            last_full_sync_native = last_full_sync_native.replace(tzinfo=timezone.utc)
+        
+        # 检查是否需要全量同步（3天一次，北京时间凌晨4点）
+        days_since_last_full = (now - last_full_sync_native).total_seconds() / (24 * 3600)
+        
+        # 如果距离上次全量同步超过3天，需要全量同步
+        if days_since_last_full >= 3:
+            logger.info(f"⏰ 距离上次全量同步已过 {days_since_last_full:.1f} 天，需要全量同步")
+            return True
+        
+        # 检查是否是北京时间凌晨4点（允许在4:00-4:30之间执行）
+        from datetime import timezone, timedelta
+        beijing_tz = timezone(timedelta(hours=8))
+        beijing_now = now.astimezone(beijing_tz)
+        current_hour = beijing_now.hour
+        current_minute = beijing_now.minute
+        
+        # 如果距离上次全量同步超过1天，且当前是北京时间凌晨4点
+        if days_since_last_full >= 1 and current_hour == 4 and current_minute < 30:
+            logger.info(f"🌙 北京时间凌晨4点定时全量同步 (距离上次 {days_since_last_full:.1f} 天)")
+            return True
+        
+        logger.info(f"⚡ 距离上次全量同步 {days_since_last_full:.1f} 天，执行增量同步")
+        return False
+    
+    async def _is_first_run(self) -> bool:
+        """检查是否为首次运行（Neo4j中是否有任何NotionPage数据）"""
+        try:
+            query = "MATCH (n:NotionPage) RETURN count(n) as page_count LIMIT 1"
+            async with self.graph_client._driver.session() as session:
+                result = await session.run(query)
+                record = await result.single()
+                page_count = record["page_count"] if record else 0
+                return page_count == 0
+        except Exception as e:
+            logger.warning(f"检查首次运行状态失败，默认为首次运行: {e}")
+            return True
+    
+    async def _run_full_sync(self) -> bool:
+        """执行全量同步，包括删除检测"""
+        try:
+            # 1. 获取所有Notion页面
+            logger.info("获取所有Notion页面...")
+            changed_pages = await self.scanner.scan_for_changes(None)  # None表示全量扫描
+            
+            # 2. 检测并删除失效页面
+            await self._cleanup_deleted_pages(changed_pages)
+            
+            # 3. 更新图数据库
+            if changed_pages:
+                logger.info(f"更新 {len(changed_pages)} 个页面到图数据库...")
+                sync_report = await self.updater.update_graph(changed_pages)
+                self._log_sync_results(sync_report)
+            else:
+                logger.info("没有发现需要更新的页面")
+            
+            return True
+            
+        except Exception as e:
+            logger.exception(f"全量同步失败: {e}")
+            return False
+    
+    async def _run_incremental_sync(self) -> bool:
+        """执行增量同步"""
+        try:
+            # Get last sync time
+            last_sync_time = await self._get_last_sync_time()
+            
+            # Scan for changed pages
+            changed_pages = await self.scanner.scan_for_changes(last_sync_time)
+            
+            if not changed_pages:
+                logger.info("No changes detected, sync cycle complete")
+                return True
+            
+            logger.info(f"Found {len(changed_pages)} pages to sync")
+            
+            # Update graph with changes
+            sync_report = await self.updater.update_graph(changed_pages)
+            
+            # Log sync results
+            self._log_sync_results(sync_report)
+            
+            return True
+            
+        except Exception as e:
+            logger.exception(f"增量同步失败: {e}")
+            return False
+    
+    async def _cleanup_deleted_pages(self, current_pages):
+        """清理已删除的页面"""
+        try:
+            # 获取当前Notion页面ID集合
+            current_page_ids = set(page.notion_id for page in current_pages)
+            
+            # 获取Neo4j中的所有页面ID
+            query = "MATCH (n:NotionPage) RETURN collect(n.notionId) as page_ids"
+            async with self.graph_client._driver.session() as session:
+                result = await session.run(query)
+                record = await result.single()
+                graph_page_ids = set(record["page_ids"] if record else [])
+            
+            # 找出需要删除的页面
+            deleted_page_ids = graph_page_ids - current_page_ids
+            
+            if deleted_page_ids:
+                logger.info(f"🗑️ 发现 {len(deleted_page_ids)} 个已删除页面，开始清理...")
+                
+                # 从Neo4j删除
+                delete_query = """
+                MATCH (n:NotionPage) 
+                WHERE n.notionId IN $page_ids
+                DETACH DELETE n
+                """
+                
+                async with self.graph_client._driver.session() as session:
+                    result = await session.run(delete_query, page_ids=list(deleted_page_ids))
+                    summary = await result.consume()
+                    
+                    logger.info(f"✅ 已从Neo4j删除 {summary.counters.nodes_deleted} 个失效页面")
+            else:
+                logger.info("✅ 没有发现需要删除的页面")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ 清理删除页面失败: {e}")
     
     def _log_sync_results(self, sync_report):
         """Log the results of the sync operation."""
