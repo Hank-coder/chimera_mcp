@@ -142,13 +142,17 @@ def _build_paths(pages_map):
         
         if len(path_ids) > 0:
             path_string = " -> ".join(path_titles)
+            # 路径长度是从根到叶子的跳数（边的数量）
+            # 对于单个页面，路径长度为0（没有父子关系）
+            # 对于有父子关系的路径，路径长度 = 节点数 - 1
+            actual_path_length = len(path_ids) - 1
             paths.append({
                 "path_string": path_string,
                 "path_titles": path_titles,
                 "path_ids": path_ids,
                 "leaf_id": leaf_id,
                 "leaf_title": pages_map[leaf_id]["title"],
-                "path_length": len(path_ids) - 1
+                "path_length": actual_path_length  # 单个页面时为0是正确的
             })
     
     return paths
