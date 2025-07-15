@@ -683,20 +683,22 @@ class NotionClient:
         uuid_format = f"{clean_id[:8]}-{clean_id[8:12]}-{clean_id[12:16]}-{clean_id[16:20]}-{clean_id[20:32]}"
         return uuid_format
     
-    async def get_page_content(self, page_id: str, include_files: bool = False, max_length: int = 0) -> str:
+    async def get_page_content(self, page_id: str, include_files: bool = False, max_length: int = 0, include_linked_pages: bool = True) -> str:
         """
-        获取页面内容
+        获取页面内容，可选择包含链接页面的内容
         
         Args:
             page_id: 页面ID
             include_files: 是否提取文档文件内容
             max_length: 内容最大长度限制，0表示不限制
+            include_linked_pages: 是否包含链接页面的内容摘要
         """
         try:
             # 规范化页面ID
             normalized_id = self._normalize_page_id(page_id)
             logger.debug(f"Getting content for page: {page_id} -> {normalized_id}")
             
+            # 获取主页面内容
             if include_files:
                 content = await self.extractor.get_page_content_with_files(normalized_id)
             else:
@@ -704,6 +706,12 @@ class NotionClient:
                 
             if content and content.strip():
                 content = content.strip()
+                
+                # 如果启用链接页面包含功能
+                if include_linked_pages:
+                    linked_content = await self._get_linked_pages_content(normalized_id)
+                    if linked_content:
+                        content += f"\n\n## 📎 链接页面内容\n{linked_content}"
                 
                 # 应用长度限制
                 if max_length > 0 and len(content) > max_length:
@@ -723,6 +731,84 @@ class NotionClient:
                 return f"权限错误: 页面 {page_id} 未与integration分享。请在Notion中将此页面分享给你的integration。"
             else:
                 return f"无法获取页面内容: {error_msg}"
+    
+    async def _get_linked_pages_content(self, page_id: str) -> str:
+        """
+        获取页面中链接的其他页面的内容摘要
+        
+        Args:
+            page_id: 当前页面ID
+            
+        Returns:
+            链接页面的内容摘要
+        """
+        try:
+            # 创建一个临时的scanner来处理链接提取
+            from sync_service.notion_scanner import NotionScanner
+            scanner = NotionScanner(self.extractor)
+            
+            # 提取页面中的链接关系
+            page_mentions, text_links = await scanner.extract_relationships_from_content(page_id)
+            
+            linked_contents = []
+            processed_pages = set()
+            
+            # 处理结构化mention的页面（直接使用页面ID）
+            for mentioned_page_id in page_mentions:
+                try:
+                    if mentioned_page_id not in processed_pages:
+                        processed_pages.add(mentioned_page_id)
+                        
+                        # 获取链接页面的基本信息
+                        page_info = await self.extractor.get_page_basic_info(mentioned_page_id)
+                        if page_info:
+                            page_title = page_info.get('title', 'Unknown')
+                            
+                            # 获取页面内容摘要（前500字）
+                            page_content = await self.extractor.get_page_content(mentioned_page_id)
+                            if page_content:
+                                # 截取前500字作为摘要
+                                summary = page_content[:500]
+                                if len(page_content) > 500:
+                                    summary += "..."
+                                
+                                linked_contents.append(f"### 🔗 {page_title}\n{summary}")
+                except Exception as e:
+                    logger.debug(f"处理mention页面 '{mentioned_page_id}' 时出错: {e}")
+                    continue
+            
+            # 处理文本链接（需要通过标题查找页面ID）
+            for link_text in text_links:
+                try:
+                    # 通过标题查找页面ID
+                    linked_page_id = await scanner.find_page_id_by_title(link_text)
+                    if linked_page_id and linked_page_id not in processed_pages:
+                        processed_pages.add(linked_page_id)
+                        
+                        # 获取页面信息和内容摘要
+                        page_info = await self.extractor.get_page_basic_info(linked_page_id)
+                        if page_info:
+                            page_title = page_info.get('title', 'Unknown')
+                            
+                            page_content = await self.extractor.get_page_content(linked_page_id)
+                            if page_content:
+                                summary = page_content[:300]  # 文本链接页面用更短的摘要
+                                if len(page_content) > 300:
+                                    summary += "..."
+                                
+                                # 根据链接类型添加不同的前缀
+                                prefix = "📄" if link_text.startswith("[[") else "👤"
+                                linked_contents.append(f"### {prefix} {page_title}\n{summary}")
+                except Exception as e:
+                    logger.debug(f"处理文本链接 '{link_text}' 时出错: {e}")
+                    continue
+            
+            return "\n\n".join(linked_contents) if linked_contents else ""
+            
+        except Exception as e:
+            logger.warning(f"获取链接页面内容失败 {page_id}: {e}")
+            return ""
+    
     
     def _truncate_page_content(self, content: str, max_length: int) -> str:
         """
@@ -776,3 +862,4 @@ class NotionClient:
         
         info = await self.extractor.get_page_basic_info(normalized_id)
         return info  # 如果页面不存在就返回None，不要返回假信息
+    

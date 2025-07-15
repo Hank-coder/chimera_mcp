@@ -3,12 +3,13 @@ Notion Scanner - Scans Notion for changes and new content.
 """
 
 import asyncio
+import re
 from datetime import datetime
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict, Any
 from loguru import logger
 
 from core.notion_client import NotionExtractor
-from core.models import NotionPageMetadata
+from core.models import NotionPageMetadata, extract_title_from_page
 from config.logging import LogExecutionTime
 
 
@@ -53,135 +54,10 @@ class NotionScanner:
             logger.exception(f"Error scanning Notion: {e}")
             return []
     
-    async def scan_full_workspace(self) -> List[NotionPageMetadata]:
-        """
-        Perform a full scan of the entire Notion workspace.
-        
-        Returns:
-            List of all pages in the workspace
-        """
-        logger.info("Performing full workspace scan")
-        
-        try:
-            with LogExecutionTime("full_workspace_scan"):
-                # Get all pages without time filter
-                pages = await self.notion_client.get_all_pages_metadata()
-                
-                # Also get database pages
-                databases = await self.notion_client.get_databases()
-                
-                # Process database pages
-                for db in databases:
-                    try:
-                        db_pages = await self.notion_client.get_database_pages(db["id"])
-                        for db_page in db_pages:
-                            # Convert to metadata
-                            metadata = await self.notion_client._extract_page_metadata(db_page)
-                            if metadata:
-                                pages.append(metadata)
-                    except Exception as e:
-                        logger.warning(f"Error scanning database {db['id']}: {e}")
-                        continue
-                
-                logger.info(f"Full scan found {len(pages)} pages")
-                return pages
-                
-        except Exception as e:
-            logger.exception(f"Error in full workspace scan: {e}")
-            return []
     
-    async def scan_specific_pages(self, page_ids: List[str]) -> List[NotionPageMetadata]:
-        """
-        Scan specific pages by their IDs.
-        
-        Args:
-            page_ids: List of Notion page IDs to scan
-            
-        Returns:
-            List of page metadata
-        """
-        logger.info(f"Scanning {len(page_ids)} specific pages")
-        
-        pages = []
-        for page_id in page_ids:
-            try:
-                # Get basic page info
-                page_info = await self.notion_client.get_page_basic_info(page_id)
-                if page_info:
-                    # Convert to full metadata
-                    metadata = await self.notion_client._extract_page_metadata(page_info)
-                    if metadata:
-                        pages.append(metadata)
-            except Exception as e:
-                logger.warning(f"Error scanning page {page_id}: {e}")
-                continue
-        
-        logger.info(f"Successfully scanned {len(pages)} specific pages")
-        return pages
     
-    async def detect_deleted_pages(self, known_page_ids: Set[str]) -> List[str]:
-        """
-        Detect pages that have been deleted from Notion.
-        
-        Args:
-            known_page_ids: Set of page IDs we know about
-            
-        Returns:
-            List of page IDs that appear to be deleted
-        """
-        logger.info(f"Checking for deleted pages among {len(known_page_ids)} known pages")
-        
-        deleted_pages = []
-        
-        # Sample check - check a subset of known pages
-        sample_size = min(100, len(known_page_ids))
-        sample_pages = list(known_page_ids)[:sample_size]
-        
-        for page_id in sample_pages:
-            try:
-                page_info = await self.notion_client.get_page_basic_info(page_id)
-                if page_info is None:
-                    # Page might be deleted or access revoked
-                    deleted_pages.append(page_id)
-                    
-            except Exception as e:
-                # If we can't access the page, it might be deleted
-                logger.debug(f"Could not access page {page_id}: {e}")
-                deleted_pages.append(page_id)
-        
-        if deleted_pages:
-            logger.info(f"Found {len(deleted_pages)} potentially deleted pages")
-        
-        return deleted_pages
     
-    async def validate_page_access(self, page_id: str) -> bool:
-        """
-        Validate that we can access a specific page.
-        
-        Args:
-            page_id: Notion page ID
-            
-        Returns:
-            True if accessible, False otherwise
-        """
-        try:
-            page_info = await self.notion_client.get_page_basic_info(page_id)
-            return page_info is not None
-        except Exception:
-            return False
     
-    async def get_scan_statistics(self) -> dict:
-        """
-        Get statistics about the scanning process.
-        
-        Returns:
-            Dictionary with scan statistics
-        """
-        return {
-            "last_scan_time": self._last_scan_time,
-            "processed_pages_count": len(self._processed_pages),
-            "processed_pages": list(self._processed_pages)
-        }
     
     def reset_scan_state(self):
         """Reset the scanner state for a fresh scan."""
@@ -189,43 +65,139 @@ class NotionScanner:
         self._last_scan_time = None
         logger.info("Scanner state reset")
     
-    async def incremental_scan(self, batch_size: int = 50) -> List[NotionPageMetadata]:
+    async def extract_relationships_from_content(self, page_id: str) -> tuple[List[str], List[str]]:
         """
-        Perform an incremental scan with batching.
+        Extract internal links and mentions from page content.
+        处理Notion的结构化mention对象和文本链接。
         
         Args:
-            batch_size: Number of pages to process per batch
+            page_id: Notion page ID
             
         Returns:
-            List of changed pages
+            Tuple of (page_ids_from_mentions, text_links_and_mentions)
         """
-        logger.info(f"Starting incremental scan with batch size {batch_size}")
-        
-        all_pages = []
-        
         try:
-            # Get all pages
-            pages = await self.notion_client.get_all_pages_metadata()
+            # 使用extractor来获取blocks
+            blocks = await self.notion_client.client.blocks.children.list(
+                block_id=page_id,
+                page_size=20
+            )
             
-            # Process in batches
-            for i in range(0, len(pages), batch_size):
-                batch = pages[i:i + batch_size]
-                
-                # Process batch
-                for page in batch:
-                    if page.notion_id not in self._processed_pages:
-                        all_pages.append(page)
-                        self._processed_pages.add(page.notion_id)
-                
-                logger.info(f"Processed batch {i//batch_size + 1}, "
-                           f"found {len(all_pages)} pages so far")
-                
-                # Small delay between batches
-                await asyncio.sleep(0.1)
+            page_mentions = []  # 结构化mention中的页面ID
+            text_links = []     # 文本中的[[...]]链接和@提及
             
-            logger.info(f"Incremental scan completed, found {len(all_pages)} pages")
-            return all_pages
+            for block in blocks["results"]:
+                # 处理结构化mention
+                block_mentions = self._extract_structured_mentions(block)
+                page_mentions.extend(block_mentions)
+                
+                # 处理文本链接
+                text = self._extract_text_from_block(block)
+                if text:
+                    # Extract [[internal links]]
+                    text_links.extend(re.findall(r'\[\[([^\]]+)\]\]', text))
+                    # Extract @mentions
+                    text_links.extend(re.findall(r'@(\w+)', text))
+            
+            return list(set(page_mentions)), list(set(text_links))
             
         except Exception as e:
-            logger.exception(f"Error in incremental scan: {e}")
-            return all_pages
+            logger.warning(f"Could not extract relationships from page {page_id}: {e}")
+            return [], []
+    
+    def _extract_structured_mentions(self, block: Dict[str, Any]) -> List[str]:
+        """
+        从block中提取结构化的页面mention
+        
+        Args:
+            block: Notion block对象
+            
+        Returns:
+            提取到的页面ID列表
+        """
+        page_ids = []
+        block_type = block.get("type", "")
+        
+        # 处理包含rich_text的block类型
+        if block_type in ["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item", "quote", "callout"]:
+            rich_text = block.get(block_type, {}).get("rich_text", [])
+            
+            for text_obj in rich_text:
+                # 检查是否为mention类型
+                if text_obj.get("type") == "mention":
+                    mention = text_obj.get("mention", {})
+                    
+                    # 处理页面mention
+                    if mention.get("type") == "page":
+                        page_id = mention.get("page", {}).get("id")
+                        if page_id:
+                            # 去掉连字符，标准化为32位ID
+                            clean_id = page_id.replace("-", "")
+                            page_ids.append(clean_id)
+        
+        return page_ids
+    
+    def _extract_text_from_block(self, block: Dict[str, Any]) -> str:
+        """
+        Extract plain text from a Notion block.
+        
+        Args:
+            block: Notion block object
+            
+        Returns:
+            Plain text string
+        """
+        block_type = block.get("type", "")
+        text_content = ""
+        
+        # Handle different block types
+        if block_type in ["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item"]:
+            rich_text = block.get(block_type, {}).get("rich_text", [])
+            text_content = "".join([item.get("plain_text", "") for item in rich_text])
+        elif block_type == "quote":
+            rich_text = block.get("quote", {}).get("rich_text", [])
+            text_content = "".join([item.get("plain_text", "") for item in rich_text])
+        elif block_type == "callout":
+            rich_text = block.get("callout", {}).get("rich_text", [])
+            text_content = "".join([item.get("plain_text", "") for item in rich_text])
+        elif block_type == "code":
+            rich_text = block.get("code", {}).get("rich_text", [])
+            text_content = "".join([item.get("plain_text", "") for item in rich_text])
+        
+        return text_content
+    
+    async def find_page_id_by_title(self, title: str) -> Optional[str]:
+        """
+        通过标题查找页面ID
+        
+        Args:
+            title: 页面标题
+            
+        Returns:
+            页面ID或None
+        """
+        try:
+            # 搜索标题匹配的页面
+            await self.notion_client._rate_limit_wait()
+            results = await self.notion_client.client.search(
+                query=title,
+                filter={
+                    "value": "page",
+                    "property": "object"
+                },
+                page_size=5
+            )
+            
+            # 查找最匹配的页面
+            for result in results.get("results", []):
+                page_title = extract_title_from_page(result)
+                # 精确匹配或包含匹配
+                if page_title and (page_title.lower() == title.lower() or title.lower() in page_title.lower()):
+                    return result["id"].replace("-", "")
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"通过标题查找页面失败 '{title}': {e}")
+            return None
+    
