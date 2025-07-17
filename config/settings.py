@@ -29,14 +29,18 @@ class Settings(BaseSettings):
     
     # Gemini Configuration
     gemini_api_key: str = Field(..., description="Gemini API key - MUST be set via environment variable")
-    gemini_model: str = Field(default="models/text-embedding-004", description="Gemini embedding model")
-    gemini_dimension: int = Field(default=768, description="Gemini embedding dimension")
+    gemini_model: str = Field(..., description="Gemini embedding model")
     
     @property
     def GEMINI_API_KEY(self) -> str:
         """Compatibility property for GEMINI_API_KEY"""
         return self.gemini_api_key
-    
+
+    @property
+    def GEMINI_MODEL(self) -> str:
+        """Compatibility property for GEMINI"""
+        return self.gemini_model
+
     # Authentication Configuration
     chimera_api_key: Optional[str] = Field(default=None, description="Chimera API key for Bearer authentication")
     enable_auth: bool = Field(default=True, description="Enable Bearer token authentication")

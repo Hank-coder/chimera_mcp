@@ -75,7 +75,7 @@ class CorrectMCPChain:
         
         # 初始化Gemini模型
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
+            model=self.settings.GEMINI_MODEL,
             google_api_key=self.settings.gemini_api_key,
             temperature=0.1,
             max_output_tokens=2000

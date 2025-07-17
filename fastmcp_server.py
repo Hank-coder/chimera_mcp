@@ -23,6 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from agents.intent_search import search_user_intent
 from utils.fastmcp_utils import get_bearer_token, get_path_contents_async
 from config.settings import get_settings
+from core.wechat_search_simple import search_wechat_relationships
 
 
 # Pydantic模型定义
@@ -75,6 +76,35 @@ class IntentSearchInput(BaseModel):
         description=(
             "单个Notion页面内容的最大字符数限制。默认10000字符，防止prompt过长。"
             "可根据LLM能力调整：大模型可设置16000+。"
+        )
+    )
+
+class RelationshipSearchInput(BaseModel):
+    """关系搜索输入模型（用于从微信关系图谱中搜索社交关系）"""
+    
+    query: str = Field(
+        ...,
+        description=(
+            "用户查询的关系问题，例如："
+            "'肥猫在GREEN研发项目里是什么角色？'"
+            "'张三和李四是什么关系？'"
+            "'谁认识yvnn？'"
+        )
+    )
+    
+    max_results: int = Field(
+        5,
+        description=(
+            "返回的最大搜索结果数量，默认返回5个相关结果。"
+            "可根据需要调整数量上限。"
+        )
+    )
+    
+    confidence_threshold: float = Field(
+        0.7,
+        description=(
+            "最低置信度分数（0.0-1.0），用于过滤低置信度结果。"
+            "默认值为0.7，表示仅返回较高置信度的关系信息。"
         )
     )
 
@@ -226,6 +256,80 @@ class ChimeraFastMCPServer:
                     success=False,
                     data={"paths": [], "search_summary": "搜索过程中发生错误"},
                     message=f"搜索失败: {str(e)}"
+                )
+        
+        @self.mcp.tool(
+            title="🫂 社交关系搜索（微信）",
+            description=(
+                "这是我（陈宇函）的微信社交关系图谱搜索工具，"
+                "用于从微信聊天记录中查找人际关系、群组成员、活动参与等社交信息。\n\n"
+                "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
+                " - query (字符串，必填)：关系查询问题，例如：\"肥猫在GREEN研发项目里是什么角色？\"\n"
+                " - max_results (整数，默认5)：返回的最大搜索结果数量。\n"
+                " - confidence_threshold (浮点数，默认0.7)：最低置信度阈值，范围0.0-1.0，用于过滤搜索结果。\n\n"
+                "请确保参数名称和类型正确，避免使用其他相似但不一致的名称。\n"
+                "示例参数JSON格式：\n"
+                "{\n"
+                "  \"query\": \"谁认识yvnn？\",\n"
+                "  \"max_results\": 5,\n"
+                "  \"confidence_threshold\": 0.7\n"
+                "}"
+            )
+        )
+        async def relationship_search(params: RelationshipSearchInput, ctx: Context) -> ChimeraResult:
+            """
+            微信关系搜索工具
+            params: RelationshipSearchInput 是业务输入参数，由客户端/大模型传入；
+            ctx: Context 是上下文参数，由 MCP 框架自动注入。
+            """
+            try:
+                # 认证检查
+                if not self._validate_auth(ctx):
+                    return ChimeraResult(
+                        success=False,
+                        data={"relationships": []},
+                        message="Authentication failed"
+                    )
+                
+                logger.info(f"Relationship search request: {params.query}")
+                
+                # 调用微信关系搜索
+                result = await search_wechat_relationships(
+                    query=params.query,
+                    max_results=params.max_results,
+                    confidence_threshold=params.confidence_threshold
+                )
+                
+                logger.info(f"Relationship search completed, success: {result.success}")
+                
+                if result.success:
+                    return ChimeraResult(
+                        success=True,
+                        data={
+                            "relationships": result.episodes,
+                            "formatted_answer": result.formatted_answer,
+                            "query_analysis": result.query_analysis.dict() if result.query_analysis else None,
+                            "processing_time_ms": result.processing_time_ms
+                        },
+                        message=f"找到 {len(result.episodes)} 个相关关系"
+                    )
+                else:
+                    return ChimeraResult(
+                        success=False,
+                        data={
+                            "relationships": [],
+                            "formatted_answer": "未找到相关关系信息",
+                            "error": result.error
+                        },
+                        message="未找到相关关系"
+                    )
+                
+            except Exception as e:
+                logger.exception(f"Error in relationship_search: {e}")
+                return ChimeraResult(
+                    success=False,
+                    data={"relationships": [], "formatted_answer": "搜索过程中发生错误"},
+                    message=f"关系搜索失败: {str(e)}"
                 )
     
     def run(self, host: str = "0.0.0.0", port: int = 3000):

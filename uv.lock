@@ -384,15 +384,6 @@ wheels = [
 ]
 
 [[package]]
-name = "diskcache"
-version = "5.6.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3f/21/1c1ffc1a039ddcc459db43cc108658f32c57d271d7289a2794e401d0fdb6/diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc", size = 67916, upload-time = "2023-08-31T06:12:00.316Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19", size = 45550, upload-time = "2023-08-31T06:11:58.822Z" },
-]
-
-[[package]]
 name = "distlib"
 version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
@@ -714,23 +705,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/39/24/33db22342cf4a2ea27c9955e6713140fedd51e8b141b5ce5260897020f1a/googleapis_common_protos-1.70.0.tar.gz", hash = "sha256:0e1b44e0ea153e6594f9f394fef15193a68aaaea2d843f83e2742717ca753257", size = 145903, upload-time = "2025-04-14T10:17:02.924Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/86/f1/62a193f0227cf15a920390abe675f386dec35f7ae3ffe6da582d3ade42c7/googleapis_common_protos-1.70.0-py3-none-any.whl", hash = "sha256:b8bfcca8c25a2bb253e0e0b0adaf8c00773e5e6af6fd92397576680b807e0fd8", size = 294530, upload-time = "2025-04-14T10:17:01.271Z" },
-]
-
-[[package]]
-name = "graphiti-core"
-version = "0.3.21"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "diskcache" },
-    { name = "neo4j" },
-    { name = "numpy" },
-    { name = "openai" },
-    { name = "pydantic" },
-    { name = "tenacity" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/09/fe80ab918875f075c8607788f44f570e5d51c86ad4c51eb6d29f8e0dfa69/graphiti_core-0.3.21.tar.gz", hash = "sha256:1cab74da73f4bfe02099cba2daa87f62576097152d073268f69c9f5d311dc4e2", size = 54178, upload-time = "2024-11-04T16:24:28.707Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/e7/fa91e5dd52bfdbde03cbf8e209c22ef7bc97119cfea6305be483a2b3fa56/graphiti_core-0.3.21-py3-none-any.whl", hash = "sha256:2c5b6001f48d07300101e4d10b57d67c07de615ba7f40e822100717818a13f3f", size = 82637, upload-time = "2024-11-04T16:24:26.523Z" },
 ]
 
 [[package]]
@@ -1523,7 +1497,6 @@ dependencies = [
     { name = "fastmcp" },
     { name = "google-genai" },
     { name = "google-generativeai" },
-    { name = "graphiti-core" },
     { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-google-genai" },
@@ -1575,7 +1548,6 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=0.2.0" },
     { name = "google-genai", specifier = ">=1.25.0" },
     { name = "google-generativeai", specifier = ">=0.3.0" },
-    { name = "graphiti-core", specifier = ">=0.3.0" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "langchain", specifier = ">=0.3.26" },
     { name = "langchain-google-genai", specifier = ">=2.0.10" },

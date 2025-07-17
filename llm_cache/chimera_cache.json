@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-07-15T11:52:52.026249",
+  "generated_at": "2025-07-17T17:32:53.074053",
   "pages": {
     "230ccc69-0d82-800e-ae4b-f773d78e778d": {
       "title": "健康报告",
@@ -17,7 +17,7 @@
       "title": "KG: NotionPage 同步以及枚举算法",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T16:19:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T17:51:00.000000000+00:00",
       "url": "https://www.notion.so/KG-NotionPage-22eccc690d8280b9acaff226e252e36e",
       "level": 2,
       "parent_id": "22eccc69-0d82-800e-9432-de9522a4a99a",
@@ -27,15 +27,16 @@
       "title": "系统核心机制与未来计划",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T16:45:00.000000000+00:00",
+      "lastEditedTime": "2025-07-16T02:23:00.000000000+00:00",
       "url": "https://www.notion.so/22eccc690d82800e9432de9522a4a99a",
       "level": 1,
-      "parent_id": null,
+      "parent_id": "22eccc69-0d82-8048-86bc-cac59dd32145",
       "children_ids": [
         "22eccc69-0d82-80b9-acaf-f226e252e36e",
         "22eccc69-0d82-80cd-a9ac-ea1b8e307a69",
         "22fccc69-0d82-80b1-a040-c93263955e9c",
-        "22fccc69-0d82-80a5-a3f8-e6f67147c7fd"
+        "22fccc69-0d82-80a5-a3f8-e6f67147c7fd",
+        "232ccc69-0d82-80d0-a186-de29f2e0e628"
       ]
     },
     "22cccc69-0d82-8067-902f-c8a49dab1657": {
@@ -70,26 +71,29 @@
       "title": "UNSW课程",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T23:31:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T17:38:00.000000000+00:00",
       "url": "https://www.notion.so/UNSW-22dccc690d82807b9d39c9de3011b0fc",
       "level": 0,
       "parent_id": null,
       "children_ids": [
         "22dccc69-0d82-80e4-8e28-cc45b8596548",
         "230ccc69-0d82-80a9-aa96-ce4c0473bb83",
-        "22dccc69-0d82-80bd-bd52-c89ac9d86b25"
+        "22dccc69-0d82-80bd-bd52-c89ac9d86b25",
+        "231ccc69-0d82-80d4-aec9-fc582a472712"
       ]
     },
     "22eccc69-0d82-8048-86bc-cac59dd32145": {
       "title": "Chimera",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T23:30:00.000000000+00:00",
+      "lastEditedTime": "2025-07-16T04:38:00.000000000+00:00",
       "url": "https://www.notion.so/Chimera-22eccc690d82804886bccac59dd32145",
       "level": 0,
       "parent_id": null,
       "children_ids": [
-        "22eccc69-0d82-80cb-93b8-c09591f177c0"
+        "22eccc69-0d82-800e-9432-de9522a4a99a",
+        "22eccc69-0d82-80cb-93b8-c09591f177c0",
+        "232ccc69-0d82-8047-8f4b-dc510e2e547d"
       ]
     },
     "22eccc69-0d82-8045-bdee-c4cb511ff833": {
@@ -106,10 +110,10 @@
       ]
     },
     "230ccc69-0d82-803b-ae5b-c9de9aa94825": {
-      "title": "Claude Code",
+      "title": "Claude Code使用指南",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T15:18:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T02:39:00.000000000+00:00",
       "url": "https://www.notion.so/Claude-Code-230ccc690d82803bae5bc9de9aa94825",
       "level": 2,
       "parent_id": "22eccc69-0d82-80ba-a66e-e538199dbced",
@@ -135,7 +139,7 @@
       "title": "视力报告",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T12:34:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T06:41:00.000000000+00:00",
       "url": "https://www.notion.so/230ccc690d8280caa109c791af9ae6de",
       "level": 2,
       "parent_id": "230ccc69-0d82-800e-ae4b-f773d78e778d",
@@ -188,7 +192,7 @@
       "title": "COMP9414",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T08:51:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T17:41:00.000000000+00:00",
       "url": "https://www.notion.so/COMP9414-22dccc690d8280e48e28cc45b8596548",
       "level": 1,
       "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
@@ -220,24 +224,26 @@
       "title": "迪哥AI课程",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T08:51:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T13:19:00.000000000+00:00",
       "url": "https://www.notion.so/AI-22eccc690d828090a927dcbc9c3d8ad7",
       "level": 1,
       "parent_id": "22eccc69-0d82-8045-bdee-c4cb511ff833",
       "children_ids": [
-        "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d"
+        "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d",
+        "231ccc69-0d82-804a-8a4a-efd62b2cf513"
       ]
     },
     "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d": {
       "title": "作业",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T08:51:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T13:19:00.000000000+00:00",
       "url": "https://www.notion.so/22eccc690d8280a99a07ed5aa4e3de6d",
       "level": 2,
       "parent_id": "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
       "children_ids": [
-        "22eccc69-0d82-80f4-8d4c-d82153bb7dc5"
+        "22eccc69-0d82-80f4-8d4c-d82153bb7dc5",
+        "232ccc69-0d82-802e-b3bf-f51f666c3bc4"
       ]
     },
     "230ccc69-0d82-80e9-a6e2-ca15b1693064": {
@@ -264,7 +270,7 @@
       "title": "1: 深度学习基础 RNN 注意力机制  LoRA原理",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T07:30:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T14:13:00.000000000+00:00",
       "url": "https://www.notion.so/1-RNN-LoRA-22eccc690d8280f48d4cd82153bb7dc5",
       "level": 3,
       "parent_id": "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d",
@@ -307,7 +313,7 @@
       "title": "文本向量化",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T02:20:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T06:25:00.000000000+00:00",
       "url": "https://www.notion.so/230ccc690d82800bba60f9a2e84740c4",
       "level": 2,
       "parent_id": "22eccc69-0d82-80ba-a66e-e538199dbced",
@@ -417,7 +423,7 @@
       "title": "COMP9444",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-13T09:23:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T17:38:00.000000000+00:00",
       "url": "https://www.notion.so/COMP9444-22dccc690d8280bdbd52c89ac9d86b25",
       "level": 1,
       "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
@@ -426,10 +432,10 @@
       ]
     },
     "22eccc69-0d82-80cd-a9ac-ea1b8e307a69": {
-      "title": "FastMCP Bearer Token 认证机制\n",
+      "title": "FastMCP+Bearer Token 认证机制\n",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-12T18:48:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T18:02:00.000000000+00:00",
       "url": "https://www.notion.so/FastMCP-Bearer-Token-22eccc690d8280cda9acea1b8e307a69",
       "level": 2,
       "parent_id": "22eccc69-0d82-800e-9432-de9522a4a99a",
@@ -439,7 +445,7 @@
       "title": "系统自述 介绍",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-12T07:47:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T06:26:00.000000000+00:00",
       "url": "https://www.notion.so/22eccc690d8280cb93b8c09591f177c0",
       "level": 1,
       "parent_id": "22eccc69-0d82-8048-86bc-cac59dd32145",
@@ -465,6 +471,16 @@
       "parent_id": "22eccc69-0d82-8086-ba1c-feb9f760a43f",
       "children_ids": []
     },
+    "232ccc69-0d82-802e-b3bf-f51f666c3bc4": {
+      "title": "2 MHA 默写",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-16T02:12:00.000000000+00:00",
+      "url": "https://www.notion.so/2-MHA-232ccc690d82802eb3bff51f666c3bc4",
+      "level": 3,
+      "parent_id": "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d",
+      "children_ids": []
+    },
     "22fccc69-0d82-80b1-a040-c93263955e9c": {
       "title": "MCP服务器配置",
       "type": "page",
@@ -476,37 +492,101 @@
       "children_ids": []
     },
     "22fccc69-0d82-80a5-a3f8-e6f67147c7fd": {
-      "title": "关系图谱检索增强 （计划）",
+      "title": " 微信驱动的关系图谱检索增强（更新版）",
       "type": "page",
       "tags": [],
-      "lastEditedTime": "2025-07-14T16:41:00.000000000+00:00",
+      "lastEditedTime": "2025-07-15T09:18:00.000000000+00:00",
       "url": "https://www.notion.so/22fccc690d8280a5a3f8e6f67147c7fd",
       "level": 2,
       "parent_id": "22eccc69-0d82-800e-9432-de9522a4a99a",
+      "children_ids": []
+    },
+    "231ccc69-0d82-804a-8a4a-efd62b2cf513": {
+      "title": "机器学习与深度学习",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-15T13:40:00.000000000+00:00",
+      "url": "https://www.notion.so/231ccc690d82804a8a4aefd62b2cf513",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
+      "children_ids": []
+    },
+    "231ccc69-0d82-8083-a039-f20449085230": {
+      "title": "“游戏化”（Gamification）",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-15T17:44:00.000000000+00:00",
+      "url": "https://www.notion.so/Gamification-231ccc690d828083a039f20449085230",
+      "level": 2,
+      "parent_id": null,
+      "children_ids": []
+    },
+    "232ccc69-0d82-80d0-a186-de29f2e0e628": {
+      "title": "Intent Search的内部工作流 + 关联Prompt",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-16T02:41:00.000000000+00:00",
+      "url": "https://www.notion.so/Intent-Search-Prompt-232ccc690d8280d0a186de29f2e0e628",
+      "level": 2,
+      "parent_id": "22eccc69-0d82-800e-9432-de9522a4a99a",
+      "children_ids": []
+    },
+    "232ccc69-0d82-8047-8f4b-dc510e2e547d": {
+      "title": "开发计划",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-16T04:38:00.000000000+00:00",
+      "url": "https://www.notion.so/232ccc690d8280478f4bdc510e2e547d",
+      "level": 1,
+      "parent_id": "22eccc69-0d82-8048-86bc-cac59dd32145",
+      "children_ids": [
+        "232ccc69-0d82-80ac-ab2d-db0b8e4663d1"
+      ]
+    },
+    "232ccc69-0d82-80ac-ab2d-db0b8e4663d1": {
+      "title": "Chimera微信关系图谱检索",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-16T10:34:00.000000000+00:00",
+      "url": "https://www.notion.so/Chimera-232ccc690d8280acab2ddb0b8e4663d1",
+      "level": 2,
+      "parent_id": "232ccc69-0d82-8047-8f4b-dc510e2e547d",
+      "children_ids": []
+    },
+    "231ccc69-0d82-80d4-aec9-fc582a472712": {
+      "title": "COMP9511",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-15T17:38:00.000000000+00:00",
+      "url": "https://www.notion.so/COMP9511-231ccc690d8280d4aec9fc582a472712",
+      "level": 1,
+      "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
       "children_ids": []
     }
   },
   "paths": [
     {
-      "path_string": "系统核心机制与未来计划 -> KG: NotionPage 同步以及枚举算法",
+      "path_string": "Chimera -> 系统核心机制与未来计划 -> KG: NotionPage 同步以及枚举算法",
       "path_titles": [
+        "Chimera",
         "系统核心机制与未来计划",
         "KG: NotionPage 同步以及枚举算法"
       ],
       "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
         "22eccc69-0d82-800e-9432-de9522a4a99a",
         "22eccc69-0d82-80b9-acaf-f226e252e36e"
       ],
       "leaf_id": "22eccc69-0d82-80b9-acaf-f226e252e36e",
       "leaf_title": "KG: NotionPage 同步以及枚举算法",
-      "path_length": 1
+      "path_length": 2
     },
     {
-      "path_string": "大模型 人工智能 -> yann哥AI课程 -> Claude Code",
+      "path_string": "大模型 人工智能 -> yann哥AI课程 -> Claude Code使用指南",
       "path_titles": [
         "大模型 人工智能",
         "yann哥AI课程",
-        "Claude Code"
+        "Claude Code使用指南"
       ],
       "path_ids": [
         "22eccc69-0d82-8045-bdee-c4cb511ff833",
@@ -514,7 +594,7 @@
         "230ccc69-0d82-803b-ae5b-c9de9aa94825"
       ],
       "leaf_id": "230ccc69-0d82-803b-ae5b-c9de9aa94825",
-      "leaf_title": "Claude Code",
+      "leaf_title": "Claude Code使用指南",
       "path_length": 2
     },
     {
@@ -790,18 +870,20 @@
       "path_length": 2
     },
     {
-      "path_string": "系统核心机制与未来计划 -> FastMCP Bearer Token 认证机制\n",
+      "path_string": "Chimera -> 系统核心机制与未来计划 -> FastMCP+Bearer Token 认证机制\n",
       "path_titles": [
+        "Chimera",
         "系统核心机制与未来计划",
-        "FastMCP Bearer Token 认证机制\n"
+        "FastMCP+Bearer Token 认证机制\n"
       ],
       "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
         "22eccc69-0d82-800e-9432-de9522a4a99a",
         "22eccc69-0d82-80cd-a9ac-ea1b8e307a69"
       ],
       "leaf_id": "22eccc69-0d82-80cd-a9ac-ea1b8e307a69",
-      "leaf_title": "FastMCP Bearer Token 认证机制\n",
-      "path_length": 1
+      "leaf_title": "FastMCP+Bearer Token 认证机制\n",
+      "path_length": 2
     },
     {
       "path_string": "Chimera -> 系统自述 介绍",
@@ -850,36 +932,132 @@
       "path_length": 2
     },
     {
-      "path_string": "系统核心机制与未来计划 -> MCP服务器配置",
+      "path_string": "大模型 人工智能 -> 迪哥AI课程 -> 作业 -> 2 MHA 默写",
       "path_titles": [
+        "大模型 人工智能",
+        "迪哥AI课程",
+        "作业",
+        "2 MHA 默写"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8045-bdee-c4cb511ff833",
+        "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
+        "22eccc69-0d82-80a9-9a07-ed5aa4e3de6d",
+        "232ccc69-0d82-802e-b3bf-f51f666c3bc4"
+      ],
+      "leaf_id": "232ccc69-0d82-802e-b3bf-f51f666c3bc4",
+      "leaf_title": "2 MHA 默写",
+      "path_length": 3
+    },
+    {
+      "path_string": "Chimera -> 系统核心机制与未来计划 -> MCP服务器配置",
+      "path_titles": [
+        "Chimera",
         "系统核心机制与未来计划",
         "MCP服务器配置"
       ],
       "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
         "22eccc69-0d82-800e-9432-de9522a4a99a",
         "22fccc69-0d82-80b1-a040-c93263955e9c"
       ],
       "leaf_id": "22fccc69-0d82-80b1-a040-c93263955e9c",
       "leaf_title": "MCP服务器配置",
-      "path_length": 1
+      "path_length": 2
     },
     {
-      "path_string": "系统核心机制与未来计划 -> 关系图谱检索增强 （计划）",
+      "path_string": "Chimera -> 系统核心机制与未来计划 ->  微信驱动的关系图谱检索增强（更新版）",
       "path_titles": [
+        "Chimera",
         "系统核心机制与未来计划",
-        "关系图谱检索增强 （计划）"
+        " 微信驱动的关系图谱检索增强（更新版）"
       ],
       "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
         "22eccc69-0d82-800e-9432-de9522a4a99a",
         "22fccc69-0d82-80a5-a3f8-e6f67147c7fd"
       ],
       "leaf_id": "22fccc69-0d82-80a5-a3f8-e6f67147c7fd",
-      "leaf_title": "关系图谱检索增强 （计划）",
+      "leaf_title": " 微信驱动的关系图谱检索增强（更新版）",
+      "path_length": 2
+    },
+    {
+      "path_string": "大模型 人工智能 -> 迪哥AI课程 -> 机器学习与深度学习",
+      "path_titles": [
+        "大模型 人工智能",
+        "迪哥AI课程",
+        "机器学习与深度学习"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8045-bdee-c4cb511ff833",
+        "22eccc69-0d82-8090-a927-dcbc9c3d8ad7",
+        "231ccc69-0d82-804a-8a4a-efd62b2cf513"
+      ],
+      "leaf_id": "231ccc69-0d82-804a-8a4a-efd62b2cf513",
+      "leaf_title": "机器学习与深度学习",
+      "path_length": 2
+    },
+    {
+      "path_string": "“游戏化”（Gamification）",
+      "path_titles": [
+        "“游戏化”（Gamification）"
+      ],
+      "path_ids": [
+        "231ccc69-0d82-8083-a039-f20449085230"
+      ],
+      "leaf_id": "231ccc69-0d82-8083-a039-f20449085230",
+      "leaf_title": "“游戏化”（Gamification）",
+      "path_length": 0
+    },
+    {
+      "path_string": "Chimera -> 系统核心机制与未来计划 -> Intent Search的内部工作流 + 关联Prompt",
+      "path_titles": [
+        "Chimera",
+        "系统核心机制与未来计划",
+        "Intent Search的内部工作流 + 关联Prompt"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
+        "22eccc69-0d82-800e-9432-de9522a4a99a",
+        "232ccc69-0d82-80d0-a186-de29f2e0e628"
+      ],
+      "leaf_id": "232ccc69-0d82-80d0-a186-de29f2e0e628",
+      "leaf_title": "Intent Search的内部工作流 + 关联Prompt",
+      "path_length": 2
+    },
+    {
+      "path_string": "Chimera -> 开发计划 -> Chimera微信关系图谱检索",
+      "path_titles": [
+        "Chimera",
+        "开发计划",
+        "Chimera微信关系图谱检索"
+      ],
+      "path_ids": [
+        "22eccc69-0d82-8048-86bc-cac59dd32145",
+        "232ccc69-0d82-8047-8f4b-dc510e2e547d",
+        "232ccc69-0d82-80ac-ab2d-db0b8e4663d1"
+      ],
+      "leaf_id": "232ccc69-0d82-80ac-ab2d-db0b8e4663d1",
+      "leaf_title": "Chimera微信关系图谱检索",
+      "path_length": 2
+    },
+    {
+      "path_string": "UNSW课程 -> COMP9511",
+      "path_titles": [
+        "UNSW课程",
+        "COMP9511"
+      ],
+      "path_ids": [
+        "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+        "231ccc69-0d82-80d4-aec9-fc582a472712"
+      ],
+      "leaf_id": "231ccc69-0d82-80d4-aec9-fc582a472712",
+      "leaf_title": "COMP9511",
       "path_length": 1
     }
   ],
   "metadata": {
-    "total_pages": 43,
-    "total_paths": 25
+    "total_pages": 50,
+    "total_paths": 31
   }
 }
