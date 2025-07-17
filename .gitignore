@@ -181,3 +181,6 @@ mcp_server.log
 .notion_cache/
 
 pyproject.toml
+
+# Wechat data
+local_data/wechat

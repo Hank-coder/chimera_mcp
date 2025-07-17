@@ -75,7 +75,7 @@ def extract_entity_episodes(json_file: str) -> List[Dict[str, Any]]:
         
         # 添加关系信息
         if related_relationships:
-            episode_content += f"{entity_name}具有以下关系："
+            episode_content += f"{entity_name} 具有以下关系："
             
             for rel in related_relationships:
                 rel_type = rel.get('type', '')
@@ -124,7 +124,7 @@ def extract_entity_episodes(json_file: str) -> List[Dict[str, Any]]:
 
 def all_json_files():
     """测试所有JSON文件"""
-    json_dir = Path("../../local_data/wechat/group")
+    json_dir = Path("local_data/wechat/group")
     json_files = list(json_dir.glob("*.json"))
     
     logger.info(f"找到 {len(json_files)} 个JSON文件")

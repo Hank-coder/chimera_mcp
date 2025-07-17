@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from agents.intent_search import search_user_intent
 from utils.fastmcp_utils import get_bearer_token, get_path_contents_async
 from config.settings import get_settings
-from core.wechat_search_simple import search_wechat_relationships
+from core.wechat_search import search_wechat_relationships
 
 
 # Pydantic模型定义
@@ -93,18 +93,10 @@ class RelationshipSearchInput(BaseModel):
     )
     
     max_results: int = Field(
-        5,
+        3,
         description=(
             "返回的最大搜索结果数量，默认返回5个相关结果。"
             "可根据需要调整数量上限。"
-        )
-    )
-    
-    confidence_threshold: float = Field(
-        0.7,
-        description=(
-            "最低置信度分数（0.0-1.0），用于过滤低置信度结果。"
-            "默认值为0.7，表示仅返回较高置信度的关系信息。"
         )
     )
 
@@ -259,20 +251,24 @@ class ChimeraFastMCPServer:
                 )
         
         @self.mcp.tool(
-            title="🫂 社交关系搜索（微信）",
+            title="社交关系搜索（微信）",
             description=(
-                "这是我（陈宇函）的微信社交关系图谱搜索工具，"
+                "这是我 *ゞ肥の猫ゞ* **（陈宇函）的微信社交关系图谱搜索工具，"
                 "用于从微信聊天记录中查找人际关系、群组成员、活动参与等社交信息。\n\n"
+                "特别适用于以下场景：\n"
+                " - 人名查询：例如 \"敏哥\"、\"JZX\"\n"
+                " - 项目查询：例如 \"GREEN项目\"、\"研发项目\"\n"
+                " - 关系查询：例如 \"谁参与了GREEN项目\"、\"肥猫是什么角色\"\n\n"
                 "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
-                " - query (字符串，必填)：关系查询问题，例如：\"肥猫在GREEN研发项目里是什么角色？\"\n"
-                " - max_results (整数，默认5)：返回的最大搜索结果数量。\n"
-                " - confidence_threshold (浮点数，默认0.7)：最低置信度阈值，范围0.0-1.0，用于过滤搜索结果。\n\n"
-                "请确保参数名称和类型正确，避免使用其他相似但不一致的名称。\n"
-                "示例参数JSON格式：\n"
+                " - query (字符串，必填)：关系查询问题，可以是人名、项目名或关系问题\n"
+                " - max_results (整数，默认3 最大为10)：返回的最大搜索结果数量\n\n"
+                "搜索返回格式：\n"
+                " - Top1节点：主要匹配实体 + 所有相关实体的摘要\n"
+                " - Top2-3节点：次要匹配实体的摘要\n\n"
+                "示例查询：\n"
                 "{\n"
-                "  \"query\": \"谁认识yvnn？\",\n"
-                "  \"max_results\": 5,\n"
-                "  \"confidence_threshold\": 0.7\n"
+                "  \"query\": \"敏哥\",\n"
+                "  \"max_results\": 3\n"
                 "}"
             )
         )
@@ -296,8 +292,7 @@ class ChimeraFastMCPServer:
                 # 调用微信关系搜索
                 result = await search_wechat_relationships(
                     query=params.query,
-                    max_results=params.max_results,
-                    confidence_threshold=params.confidence_threshold
+                    max_results=params.max_results
                 )
                 
                 logger.info(f"Relationship search completed, success: {result.success}")

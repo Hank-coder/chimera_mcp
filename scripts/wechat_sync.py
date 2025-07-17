@@ -37,7 +37,7 @@ class WeChatSyncScript:
             # 使用绝对路径，基于项目根目录 - 微信数据根目录
             self.data_path = PROJECT_ROOT / "local_data" / "wechat"
         
-        self.processed_files_path = self.data_path / "processed_wechat_files.txt"
+        self.processed_files_path = PROJECT_ROOT / "local_data" / "wechat" / "processed_wechat_files.txt"
         self.processor = WeChatDataProcessor()
         
         # 确保目录存在
@@ -85,20 +85,43 @@ class WeChatSyncScript:
             # 显示即将处理的文件
             logger.info(f"即将处理的文件: {', '.join([f.name for f in json_files])}")
             
-            # 直接处理整个文件夹，显示进度条
+            # 处理指定的文件列表，显示进度条
             with tqdm(total=1, desc="处理文件夹", unit="folder") as pbar:
                 pbar.set_description(f"处理 {len(json_files)} 个JSON文件")
                 
-                # 直接调用processor处理整个文件夹
-                result = await self.processor.process_and_store_wechat_data(str(folder_path))
+                # 初始化Graphiti客户端
+                await self.processor.client.initialize()
+                
+                # 处理指定的文件列表
+                episodes, processed_files = await self.processor.process_specific_files(json_files)
+                
+                if not episodes:
+                    logger.warning("没有Episode需要存储")
+                    result = EpisodeGenerationResult(
+                        success=True,
+                        total_episodes=0,
+                        episodes_by_type={},
+                        processed_files=processed_files
+                    )
+                else:
+                    # 批量存储到Neo4j
+                    logger.info(f"开始存储 {len(episodes)} 个Episode到Neo4j")
+                    result = await self.processor.client.add_graphiti_episodes_bulk(episodes)
+                    
+                    if result.success:
+                        logger.info(f"成功存储 {result.total_episodes} 个Episode到Neo4j")
+                        result.processed_files = processed_files
+                    else:
+                        logger.error(f"存储Episode失败: {result.errors}")
+                        result.processed_files = []
                 
                 pbar.update(1)
             
-            # 如果成功，标记所有文件为已处理
-            if result.success:
-                for json_file in json_files:
-                    self._mark_file_processed(json_file.name)
-                logger.info(f"✅ 成功处理 {len(json_files)} 个文件，生成 {result.total_episodes} 个Episode")
+            # 如果成功，标记已处理的文件
+            if result.success and result.processed_files:
+                for filename in result.processed_files:
+                    self._mark_file_processed(filename)
+                logger.info(f"✅ 成功处理 {len(result.processed_files)} 个文件，生成 {result.total_episodes} 个Episode")
             else:
                 logger.error(f"❌ 处理失败：{result.errors}")
             
@@ -155,7 +178,7 @@ class WeChatSyncScript:
             "processed_files": len(processed_files),
             "unprocessed_files": len(json_files) - len(processed_files),
             "processed_file_list": list(processed_files),
-            "unprocessed_file_list": [str(f) for f in json_files if str(f) not in processed_files]
+            "unprocessed_file_list": [str(f) for f in json_files if f.name not in processed_files]
         }
         
         return status
@@ -246,7 +269,7 @@ async def main():
     parser.add_argument("command", choices=["sync", "force", "validate", "status"], 
                        help="执行的命令")
     parser.add_argument("--data-path", type=str,
-                       help="要处理的数据目录路径，例如: local_data/wechat/group", default="local_data/wechat/group")
+                       help="要处理的数据目录路径，例如: local_data/wechat/group", default="local_data/wechat/person")
     parser.add_argument("--log-level", default="INFO", 
                        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                        help="日志级别")

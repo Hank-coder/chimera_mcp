@@ -158,7 +158,45 @@ class WeChatDataProcessor:
         }
     
     
-    async def process_wechat_data(self, input_directory: str) -> List[Dict[str, Any]]:
+    async def process_specific_files(self, json_files: List[Path]) -> tuple[List[Dict[str, Any]], List[str]]:
+        """
+        处理指定的JSON文件列表
+        
+        Args:
+            json_files: JSON文件Path对象列表
+            
+        Returns:
+            tuple[List[Dict[str, Any]], List[str]]: (生成的Graphiti Episode列表, 成功处理的文件名列表)
+        """
+        all_episodes = []
+        successfully_processed_files = []
+        
+        logger.info(f"处理指定的 {len(json_files)} 个JSON文件")
+        
+        # 重置去重状态
+        self.global_episode_ids.clear()
+        
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                episodes = self._convert_json_to_episodes(data, json_file.name)
+                all_episodes.extend(episodes)
+                successfully_processed_files.append(json_file.name)  # 只有成功处理才加入
+                logger.info(f"文件 {json_file.name} 生成 {len(episodes)} 个Episode")
+                
+            except Exception as e:
+                logger.error(f"处理文件 {json_file} 失败: {e}")
+                # 失败的文件不加入 successfully_processed_files
+        
+        logger.info(f"总共生成 {len(all_episodes)} 个去重后的Episode")
+        logger.info(f"去重统计: {len(self.global_episode_ids)} 个唯一Episode ID")
+        logger.info(f"成功处理 {len(successfully_processed_files)} 个文件")
+        
+        return all_episodes, successfully_processed_files
+
+    async def process_wechat_data(self, input_directory: str) -> tuple[List[Dict[str, Any]], List[str]]:
         """
         处理微信数据，生成Graphiti Episodes
         
@@ -166,10 +204,11 @@ class WeChatDataProcessor:
             input_directory: 输入目录路径
             
         Returns:
-            List[Dict[str, Any]]: 生成的Graphiti Episode列表
+            tuple[List[Dict[str, Any]], List[str]]: (生成的Graphiti Episode列表, 成功处理的文件名列表)
         """
         input_path = Path(input_directory)
         all_episodes = []
+        successfully_processed_files = []
         
         # 获取所有JSON文件
         json_files = list(input_path.glob("*.json"))
@@ -185,17 +224,20 @@ class WeChatDataProcessor:
                 
                 episodes = self._convert_json_to_episodes(data, json_file.name)
                 all_episodes.extend(episodes)
+                successfully_processed_files.append(json_file.name)  # 只有成功处理才加入
                 logger.info(f"文件 {json_file.name} 生成 {len(episodes)} 个Episode")
                 
             except Exception as e:
                 logger.error(f"处理文件 {json_file} 失败: {e}")
+                # 失败的文件不加入 successfully_processed_files
         
         logger.info(f"总共生成 {len(all_episodes)} 个去重后的Episode")
         logger.info(f"去重统计: {len(self.global_episode_ids)} 个唯一Episode ID")
+        logger.info(f"成功处理 {len(successfully_processed_files)} 个文件")
         
-        return all_episodes
+        return all_episodes, successfully_processed_files
     
-    async def process_and_store_wechat_data(self, input_directory: str) -> EpisodeGenerationResult:
+    async def process_and_store_wechat_data(self, input_directory: str, specific_files: List[str] = None) -> EpisodeGenerationResult:
         """
         处理微信数据并存储到Neo4j数据库
         
@@ -205,19 +247,22 @@ class WeChatDataProcessor:
         Returns:
             EpisodeGenerationResult: 处理和存储结果
         """
+        processed_files = []
+        
         try:
             # 初始化Graphiti客户端
             await self.client.initialize()
             
-            # 处理数据生成Episodes
-            episodes = await self.process_wechat_data(input_directory)
+            # 处理数据生成Episodes，获取成功处理的文件列表
+            episodes, processed_files = await self.process_wechat_data(input_directory)
             
             if not episodes:
                 logger.warning("没有Episode需要存储")
                 return EpisodeGenerationResult(
                     success=True,
                     total_episodes=0,
-                    episodes_by_type={}
+                    episodes_by_type={},
+                    processed_files=processed_files  # 记录成功处理的文件
                 )
             
             # 批量存储到Neo4j
@@ -226,8 +271,12 @@ class WeChatDataProcessor:
             
             if result.success:
                 logger.info(f"成功存储 {result.total_episodes} 个Episode到Neo4j")
+                # 存储成功后记录处理的文件
+                result.processed_files = processed_files
             else:
                 logger.error(f"存储Episode失败: {result.errors}")
+                # 存储失败时不记录processed_files，让文件下次重新处理
+                result.processed_files = []
             
             return result
             
@@ -236,7 +285,8 @@ class WeChatDataProcessor:
             return EpisodeGenerationResult(
                 success=False,
                 total_episodes=0,
-                errors=[str(e)]
+                errors=[str(e)],
+                processed_files=[]  # 出错时不记录processed_files
             )
     
     async def close(self):
@@ -252,7 +302,7 @@ class WeChatDataProcessor:
 
 
 # 便利函数
-async def process_wechat_data(input_directory: str) -> List[Dict[str, Any]]:
+async def process_wechat_data(input_directory: str) -> tuple[List[Dict[str, Any]], List[str]]:
     """
     便利函数：处理微信数据
     
@@ -260,7 +310,7 @@ async def process_wechat_data(input_directory: str) -> List[Dict[str, Any]]:
         input_directory: 输入目录路径
         
     Returns:
-        List[Dict[str, Any]]: 生成的Graphiti Episode列表
+        tuple[List[Dict[str, Any]], List[str]]: (生成的Graphiti Episode列表, 成功处理的文件名列表)
     """
     processor = WeChatDataProcessor()
     try:

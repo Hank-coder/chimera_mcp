@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-07-17T17:32:53.074053",
+  "generated_at": "2025-07-18T01:30:37.033212",
   "pages": {
     "230ccc69-0d82-800e-ae4b-f773d78e778d": {
       "title": "健康报告",
@@ -197,7 +197,8 @@
       "level": 1,
       "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
       "children_ids": [
-        "230ccc69-0d82-8038-b3a9-e74dc036d4ff"
+        "230ccc69-0d82-8038-b3a9-e74dc036d4ff",
+        "233ccc69-0d82-80d2-bcbb-ceef77ad2c97"
       ]
     },
     "230ccc69-0d82-8087-8c16-e8441761c4cd": {
@@ -561,6 +562,16 @@
       "url": "https://www.notion.so/COMP9511-231ccc690d8280d4aec9fc582a472712",
       "level": 1,
       "parent_id": "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+      "children_ids": []
+    },
+    "233ccc69-0d82-80d2-bcbb-ceef77ad2c97": {
+      "title": "CV代码",
+      "type": "page",
+      "tags": [],
+      "lastEditedTime": "2025-07-17T09:25:00.000000000+00:00",
+      "url": "https://www.notion.so/CV-233ccc690d8280d2bcbbceef77ad2c97",
+      "level": 2,
+      "parent_id": "22dccc69-0d82-80e4-8e28-cc45b8596548",
       "children_ids": []
     }
   },
@@ -1054,10 +1065,26 @@
       "leaf_id": "231ccc69-0d82-80d4-aec9-fc582a472712",
       "leaf_title": "COMP9511",
       "path_length": 1
+    },
+    {
+      "path_string": "UNSW课程 -> COMP9414 -> CV代码",
+      "path_titles": [
+        "UNSW课程",
+        "COMP9414",
+        "CV代码"
+      ],
+      "path_ids": [
+        "22dccc69-0d82-807b-9d39-c9de3011b0fc",
+        "22dccc69-0d82-80e4-8e28-cc45b8596548",
+        "233ccc69-0d82-80d2-bcbb-ceef77ad2c97"
+      ],
+      "leaf_id": "233ccc69-0d82-80d2-bcbb-ceef77ad2c97",
+      "leaf_title": "CV代码",
+      "path_length": 2
     }
   ],
   "metadata": {
-    "total_pages": 50,
-    "total_paths": 31
+    "total_pages": 51,
+    "total_paths": 32
   }
 }
