@@ -158,12 +158,13 @@ class WeChatDataProcessor:
         }
     
     
-    async def process_specific_files(self, json_files: List[Path]) -> tuple[List[Dict[str, Any]], List[str]]:
+    async def process_specific_files(self, json_files: List[Path], file_processed_callback=None) -> tuple[List[Dict[str, Any]], List[str]]:
         """
         处理指定的JSON文件列表
         
         Args:
             json_files: JSON文件Path对象列表
+            file_processed_callback: 每处理完一个文件后的回调函数，参数为文件名
             
         Returns:
             tuple[List[Dict[str, Any]], List[str]]: (生成的Graphiti Episode列表, 成功处理的文件名列表)
@@ -185,6 +186,10 @@ class WeChatDataProcessor:
                 all_episodes.extend(episodes)
                 successfully_processed_files.append(json_file.name)  # 只有成功处理才加入
                 logger.info(f"文件 {json_file.name} 生成 {len(episodes)} 个Episode")
+                
+                # 立即调用回调函数，记录已处理的文件
+                if file_processed_callback:
+                    file_processed_callback(json_file.name)
                 
             except Exception as e:
                 logger.error(f"处理文件 {json_file} 失败: {e}")

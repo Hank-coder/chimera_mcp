@@ -522,7 +522,7 @@ if __name__ == "__main__":
         try:
             # 测试查询
             test_queries = [
-                "罗旭杰的关系"
+                "肥猫"
             ]
 
             for query in test_queries:

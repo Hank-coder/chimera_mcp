@@ -92,7 +92,7 @@ class SyncService:
                 should_do_full_sync = await self._should_do_full_sync()
                 
                 if should_do_full_sync:
-                    logger.info("🔄 执行全量同步 (首次运行或距离上次全量同步超过72小时)")
+                    logger.info("🔄 执行全量同步 (清空数据库后重新构建图谱)")
                     success = await self._run_full_sync()
                 else:
                     logger.info("⚡ 执行增量同步")
@@ -270,22 +270,34 @@ class SyncService:
             return True
     
     async def _run_full_sync(self) -> bool:
-        """执行全量同步，包括删除检测"""
+        """执行全量同步，先清空Neo4j数据后重新同步（与--force-full-sync逻辑一致）"""
         try:
-            # 1. 获取所有Notion页面
+            # 1. 清空Neo4j数据（与--force-full-sync保持一致）
+            logger.info("🧹 清空Neo4j数据...")
+            clear_queries = [
+                "MATCH (n:NotionPage) DETACH DELETE n",
+                "MATCH (m:SyncMetadata) DELETE m"
+            ]
+            
+            async with self.graph_client._driver.session() as session:
+                for query in clear_queries:
+                    result = await session.run(query)
+                    summary = await result.consume()
+                    logger.info(f"清理完成：删除了 {summary.counters.nodes_deleted} 个节点")
+            
+            logger.info("🧹 Neo4j数据已清空")
+            
+            # 2. 获取所有Notion页面
             logger.info("获取所有Notion页面...")
             changed_pages = await self.scanner.scan_for_changes(None)  # None表示全量扫描
             
-            # 2. 检测并删除失效页面
-            await self._cleanup_deleted_pages(changed_pages)
-            
-            # 3. 更新图数据库
+            # 3. 更新图数据库（由于已清空，这里是全新构建）
             if changed_pages:
-                logger.info(f"更新 {len(changed_pages)} 个页面到图数据库...")
+                logger.info(f"构建 {len(changed_pages)} 个页面到图数据库...")
                 sync_report = await self.updater.update_graph(changed_pages)
                 self._log_sync_results(sync_report)
             else:
-                logger.info("没有发现需要更新的页面")
+                logger.info("没有发现任何页面")
             
             return True
             

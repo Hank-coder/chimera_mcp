@@ -85,15 +85,24 @@ class WeChatSyncScript:
             # 显示即将处理的文件
             logger.info(f"即将处理的文件: {', '.join([f.name for f in json_files])}")
             
+            # 初始化Graphiti客户端
+            await self.processor.client.initialize()
+            
             # 处理指定的文件列表，显示进度条
-            with tqdm(total=1, desc="处理文件夹", unit="folder") as pbar:
-                pbar.set_description(f"处理 {len(json_files)} 个JSON文件")
+            with tqdm(total=len(json_files), desc="处理JSON文件", unit="文件") as pbar:
+                processed_count = 0
                 
-                # 初始化Graphiti客户端
-                await self.processor.client.initialize()
+                def file_processed_callback(filename: str):
+                    """每处理完一个文件的回调函数"""
+                    nonlocal processed_count
+                    processed_count += 1
+                    pbar.update(1)
+                    pbar.set_description(f"已处理 {processed_count}/{len(json_files)} 个文件")
+                    # 立即记录已处理的文件
+                    self._mark_file_processed(filename)
                 
                 # 处理指定的文件列表
-                episodes, processed_files = await self.processor.process_specific_files(json_files)
+                episodes, processed_files = await self.processor.process_specific_files(json_files, file_processed_callback)
                 
                 if not episodes:
                     logger.warning("没有Episode需要存储")
@@ -113,14 +122,12 @@ class WeChatSyncScript:
                         result.processed_files = processed_files
                     else:
                         logger.error(f"存储Episode失败: {result.errors}")
+                        # 存储失败时，需要从txt文件中移除已记录的文件（因为它们实际没有成功存储）
                         result.processed_files = []
-                
-                pbar.update(1)
+                        logger.warning("因存储失败，需要重新处理这些文件")
             
-            # 如果成功，标记已处理的文件
-            if result.success and result.processed_files:
-                for filename in result.processed_files:
-                    self._mark_file_processed(filename)
+            # 处理结果
+            if result.success:
                 logger.info(f"✅ 成功处理 {len(result.processed_files)} 个文件，生成 {result.total_episodes} 个Episode")
             else:
                 logger.error(f"❌ 处理失败：{result.errors}")
