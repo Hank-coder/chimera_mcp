@@ -152,6 +152,7 @@ def _build_paths(pages_map):
                 "path_ids": path_ids,
                 "leaf_id": leaf_id,
                 "leaf_title": pages_map[leaf_id]["title"],
+                "leaf_last_edited_time": pages_map[leaf_id]["lastEditedTime"],
                 "path_length": actual_path_length  # 单个页面时为0是正确的
             })
     

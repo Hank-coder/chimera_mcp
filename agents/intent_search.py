@@ -35,7 +35,7 @@ class IntentSearchEngine:
         self.graphiti_client = GraphitiClient()
         self.notion_client = NotionClient()
         self.intent_prompt = IntentEvaluationPrompt()
-        
+
         # 配置Gemini
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
@@ -108,8 +108,9 @@ class IntentSearchEngine:
         """从用户输入中提取意图关键词（简化版本）"""
         
         # 直接使用用户输入作为关键词，避免额外的API调用
-        # 移除常见的停用词
-        stop_words = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'}
+        # 定义停用词
+        stop_words = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
+                      '一个', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'}
         
         # 简单分词（按空格分割）
         words = user_input.split()
@@ -164,6 +165,7 @@ class IntentSearchEngine:
                     'path_ids': path_data["path_ids"],
                     'leaf_id': leaf_id,
                     'leaf_title': path_data["leaf_title"],
+                    'leaf_last_edited_time': leaf_page.get("lastEditedTime", ""),
                     'leaf_tags': leaf_page.get("tags", []),
                     'leaf_url': leaf_page.get("url", ""),
                     'path_length': path_data["path_length"],
@@ -354,6 +356,8 @@ class IntentSearchEngine:
             path_string = path_info.get('path_string', '')
             path_titles = path_info.get('path_titles', [])
             path_ids = path_info.get('path_ids', [])
+            # 获取时间信息
+            last_edited_time = path_info.get('leaf_last_edited_time', '')
         else:
             # 备用方案
             page_id = f"dummy_page_{document_index}"
@@ -363,6 +367,7 @@ class IntentSearchEngine:
             path_string = ''
             path_titles = []
             path_ids = []
+            last_edited_time = ''
         
         # 从Notion获取页面内容（包含文档文件）
         try:
@@ -381,7 +386,8 @@ class IntentSearchEngine:
                 confidence_score=self._get_confidence_score(eval_item),
                 path_string=path_string,
                 path_titles=path_titles,
-                path_ids=path_ids
+                path_ids=path_ids,
+                last_edited_time=last_edited_time
             )
             
         except Exception as e:
@@ -395,7 +401,8 @@ class IntentSearchEngine:
                 confidence_score=self._get_confidence_score(eval_item),
                 path_string=path_string,
                 path_titles=path_titles,
-                path_ids=path_ids
+                path_ids=path_ids,
+                last_edited_time=last_edited_time
             )
     
     async def _expand_related_pages(

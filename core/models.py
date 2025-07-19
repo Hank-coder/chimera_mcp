@@ -212,6 +212,8 @@ class CorePageResult(BaseModel):
     path_string: Optional[str] = Field(None, description="完整路径字符串，如'Hank -> 简历'")
     path_titles: List[str] = Field(default_factory=list, description="路径中所有页面的标题")
     path_ids: List[str] = Field(default_factory=list, description="路径中所有页面的ID")
+    # 添加时间信息
+    last_edited_time: Optional[str] = Field(None, description="叶子节点最后编辑时间")
 
 
 class RelatedPageResult(BaseModel):

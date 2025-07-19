@@ -6,6 +6,7 @@
 from langchain.prompts import PromptTemplate
 from typing import List, Dict, Any
 import json
+from datetime import datetime, timezone
 
 
 class IntentEvaluationPrompt:
@@ -14,60 +15,70 @@ class IntentEvaluationPrompt:
     def __init__(self):
         # 路径置信度评估模板
         self.confidence_evaluation_template = PromptTemplate(
-            input_variables=["user_input", "candidate_paths"],
+            input_variables=["user_input", "candidate_paths", "current_date"],
             template="""
-你是一个智能的个人知识库导航助手。用户提出了一个查询，我已经列出了所有可用的完整路径（从根节点到叶子节点）。请从中选择最能回答用户问题的路径。
+            你是一个极其严谨和注重细节的个人知识库导航助手。你必须遵循一个严格的两阶段评估流程来筛选路径。
 
-用户查询：
-{user_input}
+            **第一阶段：内容相关性评估**
+            首先，对“所有可用的完整路径列表”中的每一项进行内容相关性评估，忽略路径中附加的时间戳信息。根据路径的关键词、
+            语义和上下文与“用户查询”的匹配程度，在心中给出一个“初步分数”。
+            
+            请重点关注：
+                1. 路径中的关键词（特别是叶子节点）是否匹配用户查询
+                2. 完整路径的语义是否与查询主题相关
+                3. 从路径判断最终内容是否能回答用户问题
+                4. 路径的上下文关系是否有助于理解用户意图
+    
+            **第二阶段：时间一致性筛选**
+            
+            **当前时间 (UTC)**：
+            {current_date}
 
-所有可用的完整路径列表：
-{candidate_paths}
+            在完成第一阶段后，执行以下时间过滤逻辑：
+            1.  分析“用户查询”：`{user_input}`
+            2.  判断查询中是否包含时间意图（如“最近”、“昨天”、“上周”、“2-4月”、“7月初”）。
+            3. **任何不在时间意图内的路径请给予较低置信度**
 
-请评估每条路径与用户查询的相关性（0-1之间的分数）：
-- 1.0：完全匹配用户查询，路径的叶子节点肯定包含答案
-- 0.8-0.9：高度相关，路径很可能包含用户需要的信息
-- 0.6-0.7：中等相关，路径可能包含部分相关信息
-- 0.4-0.5：低度相关，路径可能有一些相关内容
-- 0.0-0.3：几乎无关或完全无关
+            ---
+            **用户查询**：
+            {user_input}
 
-请重点关注：
-1. 路径中的关键词（特别是叶子节点）是否匹配用户查询
-2. 完整路径的语义是否与查询主题相关
-3. 从路径判断最终内容是否能回答用户问题
-4. 路径的上下文关系是否有助于理解用户意图
+            **所有可用的完整路径列表（内含时间戳）**：
+            {candidate_paths}
+            ---
+            **输出要求**
+            -   请严格按照以下JSON格式返回。
+            -   **只** 包含最终 `confidence_score` **大于等于 0.65** 的路径。
+            -   `reasoning` 必须简洁地解释评估结果，**必须明确提及时间评估的结果**（例如，“时间匹配成功”或“查询无时间要求”）。
+            -   `document_index` 必须对应原始路径列表的准确索引（从0开始）。
+            -   `summary`中的`total_candidates`请填写候选路径的总数。
+            -   不要添加markdown或其他任何多余的格式。
 
-请严格按照以下JSON格式返回，只选择置信度≥0.6的路径：
-{{
-    "evaluations": [
-        {{
-            "document_index": 0,
-            "confidence_score": 0.85,
-            "reasoning": "路径的叶子节点直接匹配用户查询..."
-        }},
-        {{
-            "document_index": 5,
-            "confidence_score": 0.72,
-            "reasoning": "路径提供了相关的上下文信息..."
-        }}
-    ],
-    "summary": {{
-        "total_candidates": {total_count},
-        "high_confidence_count": 2,
-        "threshold_used": 0.6
-    }}
-}}
-
-注意：
-1. document_index必须对应路径列表的准确索引（从0开始）
-2. confidence_score必须是0-1之间的精确数值
-3. 只返回置信度≥0.6的路径评估结果
-4. reasoning要具体说明为什么这个路径相关
-5. 严格使用JSON格式，不要添加markdown或其他格式
-"""
+            ```json
+            {{
+                "evaluations": [
+                    {{
+                        "document_index": 0,
+                        "confidence_score": 0.9,
+                        "reasoning": "内容高度相关，路径的编辑时间符合用户查询'上周'的时间范围，通过时间否决检查。"
+                    }},
+                    {{
+                        "document_index": 5,
+                        "confidence_score": 0.8,
+                        "reasoning": "内容相关，用户查询无特定时间要求，跳过时间否决检查。"
+                    }}
+                ],
+                "summary": {{
+                    "total_candidates": {total_count},
+                    "high_confidence_count": 2,
+                    "threshold_used": 0.65
+                }}
+            }}
+            ```
+            """
         )
-        
-        # 关键词提取模板
+
+        # 关键词提取模板 目前未使用
         self.keyword_extraction_template = PromptTemplate(
             input_variables=["user_input"],
             template="""
@@ -80,6 +91,7 @@ class IntentEvaluationPrompt:
 2. 专业术语
 3. 具体的概念或实体名称
 4. 动作词汇（如果重要的话）
+5. 时间信息 （如果遇到上周，上个月，2-3月 等含糊时间范围 智能转换成 yyyy-mm-dd~yyyy-mm-dd)
 
 请严格按照JSON格式返回：
 {{
@@ -153,36 +165,41 @@ class IntentEvaluationPrompt:
 }}
 """
         )
-    
+
+
+
+
+
     def create_evaluation_prompt(self, user_input: str, candidate_paths: List[Dict[str, Any]]) -> str:
-        """创建路径置信度评估的完整prompt"""
+        """创建路径置信度评估的完整prompt 并返回"""
         
-        # 格式化完整路径信息
+        # 格式化完整路径信息（精简版本）
         formatted_paths = []
         for i, path in enumerate(candidate_paths):
             path_string = path.get('path_string', 'Unknown Path')
-            tags_str = ', '.join(path.get('leaf_tags', [])) if path.get('leaf_tags') else '无标签'
-            path_length = path.get('path_length', 0)
-            path_type = path.get('path_type', 'unknown')
+            last_edited = path.get('leaf_last_edited_time', '未知时间')
             
             path_info = f"""{i}. "{path_string}"
-   - 叶子节点标签: {tags_str}
-   - 路径长度: {path_length}
-   - 路径类型: {path_type}"""
+   - 编辑时间: {last_edited}"""
             formatted_paths.append(path_info)
         
         candidate_paths_str = "\n".join(formatted_paths)
         
-        # 替换模板中的total_count占位符
+        # 获取当前日期
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f000+00:00")
+        
+        # 替换模板中的占位符
         template_str = self.confidence_evaluation_template.template.replace(
             "{total_count}", str(len(candidate_paths))
         )
-        
-        return template_str.format(
+
+        output = template_str.format(
             user_input=user_input,
-            candidate_paths=candidate_paths_str
+            candidate_paths=candidate_paths_str,
+            current_date=current_date
         )
-    
+        return output
+
     def create_keyword_extraction_prompt(self, user_input: str) -> str:
         """创建关键词提取prompt"""
         return self.keyword_extraction_template.format(user_input=user_input)

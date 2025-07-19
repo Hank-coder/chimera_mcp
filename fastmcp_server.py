@@ -143,7 +143,7 @@ class ChimeraFastMCPServer:
                     "这是我（陈宇函）的个人知识库“Chimera”搜索工具，"
                     "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
                     "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
-                    " - query (字符串，必填)：搜索关键词或短语，示例：\"碳中和 计划\"\n"
+                    " - query (字符串，必填)：搜索关键词或短语（如有时间信息请包含），示例：\"上周碳中和计划\"\n"
                     " - confidence_threshold (浮点数，默认0.8)：最低置信度阈值，范围0.5-1.0，用于过滤搜索结果。\n"
                     " - search_results (整数，默认3)：返回的最大搜索结果条数。\n"
                     " - expansion_depth (整数，默认1)：路径扩展深度，决定关联更多上下游页面的层级。\n"
@@ -203,17 +203,39 @@ class ChimeraFastMCPServer:
                                 max_file_content_length=params.max_file_content_length
                             )
                             
+                            # 获取叶子页面（最后一个页面）的时间信息
+                            leaf_time = ""
+                            if path_contents:
+                                leaf_page = path_contents[-1]  # 叶子页面是路径中的最后一个
+                                leaf_time = leaf_page.get("last_edited_time", "")
+                            
                             path_data = {
                                 "path": core_page.path_string,
                                 "confidence": core_page.confidence_score,
+                                "last_edited_time": leaf_time,
                                 "path_contents": path_contents,
                                 "total_pages": len(path_contents)
                             }
                         else:
-                            # 备用：单页面结果
+                            # 备用：单页面结果，从JSON缓存获取时间
+                            import json
+                            from pathlib import Path
+                            page_time = ""
+                            try:
+                                cache_file = Path("llm_cache/chimera_cache.json")
+                                if cache_file.exists():
+                                    with open(cache_file, 'r', encoding='utf-8') as f:
+                                        cache_data = json.load(f)
+                                        pages = cache_data.get("pages", {})
+                                        page_info = pages.get(core_page.notion_id, {})
+                                        page_time = page_info.get("lastEditedTime", "")
+                            except Exception:
+                                pass
+                            
                             path_data = {
                                 "path": core_page.title,
                                 "confidence": core_page.confidence_score,
+                                "last_edited_time": page_time,
                                 "notion_id": core_page.notion_id,
                                 "title": core_page.title,
                                 "content": core_page.content

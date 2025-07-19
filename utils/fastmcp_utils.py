@@ -31,7 +31,7 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
                                  include_files: bool = True, max_content_length: int = 8000, 
                                  max_file_content_length: int = 8000) -> List[Dict[str, Any]]:
     """
-    获取路径中所有页面的内容，支持文档提取和长度控制
+    获取路径中所有页面的内容，支持文档提取和长度控制，从缓存中获取时间信息
     
     Args:
         notion_client: Notion客户端实例
@@ -48,6 +48,19 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
         from core.notion_client import NotionClient
         notion_client = NotionClient()
     
+    # 从缓存中加载页面时间信息
+    cache_pages = {}
+    try:
+        import json
+        from pathlib import Path
+        cache_file = Path("llm_cache/chimera_cache.json")
+        if cache_file.exists():
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+                cache_pages = cache_data.get("pages", {})
+    except Exception as e:
+        logger.warning(f"无法加载缓存文件获取时间信息: {e}")
+    
     # 临时设置文件提取器的长度限制
     from core.file_extractor import file_extractor
     original_max_length = file_extractor.max_content_length
@@ -59,6 +72,10 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
     try:
         for i, (title, page_id) in enumerate(zip(path_titles, path_ids)):
             try:
+                # 从缓存中获取时间信息
+                page_cache = cache_pages.get(page_id, {})
+                last_edited_time = page_cache.get('lastEditedTime', '')
+                
                 # 根据参数决定是否提取文档内容
                 if include_files:
                     content = await notion_client.get_page_content(
@@ -83,7 +100,8 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
                     "notion_id": page_id,
                     "content": content,
                     "has_files": include_files,
-                    "content_length": len(content)
+                    "content_length": len(content),
+                    "last_edited_time": last_edited_time
                 })
             except Exception as e:
                 error_msg = str(e)
