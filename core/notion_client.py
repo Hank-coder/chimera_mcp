@@ -683,20 +683,27 @@ class NotionClient:
         uuid_format = f"{clean_id[:8]}-{clean_id[8:12]}-{clean_id[12:16]}-{clean_id[16:20]}-{clean_id[20:32]}"
         return uuid_format
     
-    async def get_page_content(self, page_id: str, include_files: bool = False, max_length: int = 0, include_linked_pages: bool = True) -> str:
+    async def get_page_content(self, page_id: str, include_files: bool = False, max_length: int = 0, include_linked_pages: bool = True) -> tuple[str, str]:
         """
-        获取页面内容，可选择包含链接页面的内容
+        获取页面内容和最新时间戳
         
         Args:
             page_id: 页面ID
             include_files: 是否提取文档文件内容
             max_length: 内容最大长度限制，0表示不限制
             include_linked_pages: 是否包含链接页面的内容摘要
+            
+        Returns:
+            tuple: (content, latest_last_edited_time)
         """
         try:
             # 规范化页面ID
             normalized_id = self._normalize_page_id(page_id)
             logger.debug(f"Getting content for page: {page_id} -> {normalized_id}")
+            
+            # 获取页面基本信息（包含最新时间戳）
+            page_info = await self.extractor.get_page_basic_info(normalized_id)
+            latest_timestamp = page_info.get('last_edited_time', '') if page_info else ''
             
             # 获取主页面内容
             if include_files:
@@ -717,20 +724,21 @@ class NotionClient:
                 if max_length > 0 and len(content) > max_length:
                     content = self._truncate_page_content(content, max_length)
                 
-                return content
+                return content, latest_timestamp
             else:
                 # 页面存在但内容为空
-                page_info = await self.extractor.get_page_basic_info(normalized_id)
                 page_title = page_info.get('title', 'Unknown') if page_info else 'Unknown'
-                return f"页面 '{page_title}' 当前没有内容，这可能是一个空白页面或仅包含标题的页面。"
+                empty_content = f"页面 '{page_title}' 当前没有内容，这可能是一个空白页面或仅包含标题的页面。"
+                return empty_content, latest_timestamp
         except Exception as e:
             error_msg = str(e)
             if "Could not find block with ID" in error_msg:
-                return f"无法访问页面 {page_id}: 页面不存在或未授权访问。请确保：\n1. 页面ID正确\n2. 页面已与Notion integration分享\n3. 检查页面权限设置"
+                error_content = f"无法访问页面 {page_id}: 页面不存在或未授权访问。请确保：\n1. 页面ID正确\n2. 页面已与Notion integration分享\n3. 检查页面权限设置"
             elif "Make sure the relevant pages and databases are shared" in error_msg:
-                return f"权限错误: 页面 {page_id} 未与integration分享。请在Notion中将此页面分享给你的integration。"
+                error_content = f"权限错误: 页面 {page_id} 未与integration分享。请在Notion中将此页面分享给你的integration。"
             else:
-                return f"无法获取页面内容: {error_msg}"
+                error_content = f"无法获取页面内容: {error_msg}"
+            return error_content, ""
     
     async def _get_linked_pages_content(self, page_id: str) -> str:
         """

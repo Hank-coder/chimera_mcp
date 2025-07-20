@@ -72,23 +72,28 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
     try:
         for i, (title, page_id) in enumerate(zip(path_titles, path_ids)):
             try:
-                # 从缓存中获取时间信息
+                # 从缓存中获取时间信息（作为备用）
                 page_cache = cache_pages.get(page_id, {})
-                last_edited_time = page_cache.get('lastEditedTime', '')
                 
                 # 根据参数决定是否提取文档内容
                 if include_files:
-                    content = await notion_client.get_page_content(
+                    content, latest_timestamp = await notion_client.get_page_content(
                         page_id, 
                         include_files=True, 
                         max_length=max_content_length
                     )
                 else:
-                    content = await notion_client.get_page_content(
+                    content, latest_timestamp = await notion_client.get_page_content(
                         page_id, 
                         include_files=False, 
                         max_length=max_content_length
                     )
+                
+                # 使用实时时间戳，如果获取失败则使用缓存时间
+                if latest_timestamp:
+                    last_edited_time = latest_timestamp
+                else:
+                    last_edited_time = page_cache.get('lastEditedTime', '')
                 
                 # 额外的长度控制（防止单个页面过长）
                 if max_content_length > 0 and len(content) > max_content_length:

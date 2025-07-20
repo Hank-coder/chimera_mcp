@@ -371,7 +371,7 @@ class IntentSearchEngine:
         
         # 从Notion获取页面内容（包含文档文件）
         try:
-            page_content = await self.notion_client.get_page_content(
+            page_content, latest_timestamp = await self.notion_client.get_page_content(
                 page_id, 
                 include_files=True,  # 提取文档内容
                 max_length=8000     # 限制内容长度
@@ -387,7 +387,7 @@ class IntentSearchEngine:
                 path_string=path_string,
                 path_titles=path_titles,
                 path_ids=path_ids,
-                last_edited_time=last_edited_time
+                last_edited_time=latest_timestamp  # 使用实时时间戳
             )
             
         except Exception as e:
@@ -423,7 +423,7 @@ class IntentSearchEngine:
             
             for result in expanded_results:
                 # 获取页面内容（包含文档文件）
-                page_content = await self.notion_client.get_page_content(
+                page_content, _ = await self.notion_client.get_page_content(
                     result.get('page_id'),
                     include_files=True,  # 提取文档内容
                     max_length=6000     # 相关页面限制较小
