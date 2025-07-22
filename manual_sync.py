@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Chimera 同步服务启动脚本
-专门用于启动15分钟定期同步监测
+Chimera 手动同步脚本
+专门用于手动全量同步和维护操作
 """
 
 import asyncio
@@ -10,20 +10,18 @@ import sys
 import argparse
 from pathlib import Path
 
-from sync_service.sync_service import SyncService
-
 # 添加项目根目录到路径
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-
 from config.logging import setup_logging
 from config.settings import get_settings
+from sync_service.sync_service import SyncService
 from loguru import logger
 
 
 async def generate_cache():
-    """生成JSON缓存文件（简化版本，不再处理删除检测）"""
+    """生成JSON缓存文件"""
     import json
     from pathlib import Path
     from datetime import datetime
@@ -142,9 +140,6 @@ def _build_paths(pages_map):
         
         if len(path_ids) > 0:
             path_string = " -> ".join(path_titles)
-            # 路径长度是从根到叶子的跳数（边的数量）
-            # 对于单个页面，路径长度为0（没有父子关系）
-            # 对于有父子关系的路径，路径长度 = 节点数 - 1
             actual_path_length = len(path_ids) - 1
             paths.append({
                 "path_string": path_string,
@@ -153,7 +148,7 @@ def _build_paths(pages_map):
                 "leaf_id": leaf_id,
                 "leaf_title": pages_map[leaf_id]["title"],
                 "leaf_last_edited_time": pages_map[leaf_id]["lastEditedTime"],
-                "path_length": actual_path_length  # 单个页面时为0是正确的
+                "path_length": actual_path_length
             })
     
     return paths
@@ -178,51 +173,6 @@ def _write_cache_file(cache_file, cache_data):
     temp_file.replace(cache_file)
 
 
-async def run_continuous_sync():
-    """运行持续的同步监测"""
-    settings = get_settings()
-    sync_interval = settings.sync_interval_minutes
-    
-    logger.info(f"🔄 启动{sync_interval}分钟同步监测服务...")
-    
-    sync_service = SyncService()
-    sync_cycle_count = 0
-    
-    try:
-        await sync_service.initialize()
-        logger.info(f"✅ 同步服务已启动，每{sync_interval}分钟检查更新")
-        
-        while True:
-            try:
-                logger.info("🔍 开始检查Notion更新...")
-                success = await sync_service.run_manual_sync()
-                
-                if success:
-                    logger.info("✅ 同步检查完成")
-                    # 生成JSON缓存
-                    await generate_cache()
-                else:
-                    logger.warning("⚠️ 同步检查发现问题")
-                
-                sync_cycle_count += 1
-
-                # 等待配置的时间间隔
-                logger.info(f"⏳ 等待{sync_interval}分钟后进行下次检查...")
-                await asyncio.sleep(sync_interval * 60)
-                    
-            except Exception as e:
-                logger.exception(f"❌ 同步监测异常: {e}")
-                # 遇到异常等待5分钟后重试
-                logger.info("⏳ 等待5分钟后重试...")
-                await asyncio.sleep(5 * 60)
-                
-    except KeyboardInterrupt:
-        logger.info("收到中断信号，正在停止...")
-    finally:
-        await sync_service.stop()
-        logger.info("✅ 同步服务已停止")
-
-
 async def run_manual_sync():
     """运行一次性手动同步"""
     logger.info("⚡ 执行手动同步...")
@@ -236,7 +186,8 @@ async def run_manual_sync():
             await generate_cache()
         else:
             logger.error("❌ 手动同步失败")
-            sys.exit(1)
+            return False
+        return True
     finally:
         await sync_service.stop()
 
@@ -269,7 +220,7 @@ async def run_force_full_sync():
         
     except Exception as e:
         logger.error(f"❌ 清空Neo4j数据失败: {e}")
-        return
+        return False
     
     # 现在运行同步（将触发全量同步）
     logger.info("🔄 开始全量同步...")
@@ -281,64 +232,84 @@ async def run_force_full_sync():
             logger.info("✅ 强制全量同步完成")
             # 生成JSON缓存
             await generate_cache()
+            return True
         else:
             logger.error("❌ 强制全量同步失败")
-            sys.exit(1)
+            return False
     finally:
         await sync_service.stop()
 
 
-async def show_status():
-    """显示系统状态"""
-    logger.info("📊 检查系统状态...")
+async def show_stats():
+    """显示Neo4j数据库统计信息"""
+    logger.info("📊 检查Neo4j数据库统计...")
     
     try:
-        sync_service = SyncService()
-        await sync_service.initialize()
+        from core.graphiti_client import GraphitiClient
+        graph_client = GraphitiClient()
+        await graph_client.initialize()
         
-        stats = await sync_service.get_stats()
-        logger.info(f"同步服务状态: {stats}")
+        stats_query = """
+        CALL {
+            MATCH (p:NotionPage) RETURN count(p) as pages
+        }
+        CALL {
+            MATCH ()-[r:CHILD_OF]->() RETURN count(r) as child_relations
+        }
+        CALL {
+            MATCH ()-[r:HAS_TAG]->() RETURN count(r) as tag_relations
+        }
+        RETURN pages, child_relations, tag_relations
+        """
         
-        await sync_service.stop()
+        async with graph_client._driver.session() as session:
+            result = await session.run(stats_query)
+            record = await result.single()
+            
+            if record:
+                logger.info(f"📄 总页面数: {record['pages']}")
+                logger.info(f"🔗 父子关系数: {record['child_relations']}")
+                logger.info(f"🏷️  标签关系数: {record['tag_relations']}")
+            else:
+                logger.info("📊 未找到统计数据")
+        
+        await graph_client.close()
+        return True
         
     except Exception as e:
-        logger.error(f"无法获取状态: {e}")
+        logger.error(f"无法获取统计信息: {e}")
+        return False
 
 
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="Chimera 同步服务",
+        description="Chimera 手动同步和维护工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  python run_chimera.py                    # 运行15分钟持续同步监测
-  python run_chimera.py --manual-sync      # 执行一次手动同步
-  python run_chimera.py --status           # 显示系统状态
-  python run_chimera.py --generate-cache   # 生成JSON缓存文件
-  python run_chimera.py --force-full-sync  # 强制全量同步（测试首次运行）
+  python manual_sync.py --sync              # 执行一次手动同步
+  python manual_sync.py --full-sync         # 强制全量同步（清空后重建）
+  python manual_sync.py --generate-cache    # 仅生成JSON缓存
+  python manual_sync.py --stats             # 显示数据库统计信息
 
-注意: MCP服务器请单独运行：
-  python fastmcp_server.py --port 3000
+注意: 
+- 手动同步用于测试或维护
+- 生产环境应使用 webhook_server.py 进行实时同步
+- MCP服务器请单独运行：python fastmcp_server.py
         """
     )
     
     parser.add_argument(
-        "--manual-sync", 
+        "--sync", 
         action="store_true",
         help="执行一次手动同步"
     )
     
     parser.add_argument(
-        "--status", 
+        "--full-sync", 
         action="store_true",
-        help="显示系统状态"
-    )
-    
-    parser.add_argument(
-        "--debug", 
-        action="store_true",
-        help="启用调试模式"
+        help="强制执行全量同步（清空Neo4j数据后重新同步）"
     )
     
     parser.add_argument(
@@ -348,9 +319,15 @@ def main():
     )
     
     parser.add_argument(
-        "--force-full-sync", 
+        "--stats", 
         action="store_true",
-        help="强制执行全量同步（清空Neo4j数据后重新同步）"
+        help="显示Neo4j数据库统计信息"
+    )
+    
+    parser.add_argument(
+        "--debug", 
+        action="store_true",
+        help="启用调试模式"
     )
     
     args = parser.parse_args()
@@ -358,10 +335,15 @@ def main():
     # 设置日志
     setup_logging()
     
-    # 显示欢迎信息
-    logger.info("=" * 60)
-    logger.info("🔄 Chimera 同步服务")
-    logger.info("=" * 60)
+    # 显示标题
+    logger.info("=" * 50)
+    logger.info("🔧 Chimera 手动同步工具")
+    logger.info("=" * 50)
+    
+    # 检查参数
+    if not any([args.sync, args.full_sync, args.generate_cache, args.stats]):
+        logger.error("❌ 请指定操作参数，使用 --help 查看帮助")
+        sys.exit(1)
     
     # 检查配置
     settings = get_settings()
@@ -369,21 +351,26 @@ def main():
         logger.info(f"配置: Neo4j URI: {settings.neo4j_uri}")
     
     # 根据参数运行相应的功能
+    success = True
     try:
-        if args.manual_sync:
-            asyncio.run(run_manual_sync())
-        elif args.status:
-            asyncio.run(show_status())
+        if args.sync:
+            success = asyncio.run(run_manual_sync())
+        elif args.full_sync:
+            success = asyncio.run(run_force_full_sync())
         elif args.generate_cache:
-            asyncio.run(generate_cache())
-        elif args.force_full_sync:
-            asyncio.run(run_force_full_sync())
-        else:
-            # 默认运行持续同步
-            asyncio.run(run_continuous_sync())
+            success = asyncio.run(generate_cache())
+        elif args.stats:
+            success = asyncio.run(show_stats())
             
     except Exception as e:
         logger.exception(f"程序异常退出: {e}")
+        success = False
+    
+    if success:
+        logger.info("✅ 操作完成")
+        sys.exit(0)
+    else:
+        logger.error("❌ 操作失败")
         sys.exit(1)
 
 

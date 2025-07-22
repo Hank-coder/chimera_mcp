@@ -69,46 +69,33 @@ class SyncService:
     
     async def run_sync_cycle(self) -> bool:
         """
-        Run a complete sync cycle.
-        决定执行全量同步或增量同步的策略：
-        - 首次运行：全量同步
-        - 距离上次全量同步超过3天：全量同步
-        - 北京时间凌晨4点定时全量同步（距离上次全量同步超过1天）
-        - 其他情况：增量同步
+        Run a manual full sync cycle.
+        增量同步已废弃，改用Notion Webhook实时推送。
+        此方法现在只执行全量同步，用于手动同步。
         
         Returns:
             True if sync was successful, False otherwise
         """
-        logger.info("Starting sync cycle...")
+        logger.info("Starting manual full sync cycle...")
         
         try:
-            with LogExecutionTime("sync_cycle"):
+            with LogExecutionTime("full_sync_cycle"):
                 # Check health of both services
                 if not await self._health_check():
                     logger.error("Health check failed, skipping sync cycle")
                     return False
                 
-                # 判断是否需要全量同步
-                should_do_full_sync = await self._should_do_full_sync()
-                
-                if should_do_full_sync:
-                    logger.info("🔄 执行全量同步 (清空数据库后重新构建图谱)")
-                    success = await self._run_full_sync()
-                else:
-                    logger.info("⚡ 执行增量同步")
-                    success = await self._run_incremental_sync()
+                logger.info("🔄 执行手动全量同步 (清空数据库后重新构建图谱)")
+                success = await self._run_full_sync()
                 
                 if success:
-                    # Update last sync time
+                    # Update sync timestamps
                     await self._update_last_sync_time()
+                    await self._update_last_full_sync_time()
                     
-                    # 如果是全量同步，更新全量同步时间
-                    if should_do_full_sync:
-                        await self._update_last_full_sync_time()
-                    
-                    logger.info("Sync cycle completed successfully")
+                    logger.info("Manual full sync completed successfully")
                 else:
-                    logger.error("Sync cycle failed")
+                    logger.error("Manual full sync failed")
                 
                 return success
                 
@@ -204,57 +191,7 @@ class SyncService:
         except Exception as e:
             logger.warning(f"Could not update last full sync time: {e}")
     
-    async def _should_do_full_sync(self) -> bool:
-        """判断是否应该执行全量同步"""
-        # 检查是否为首次运行程序（检查Neo4j中是否有任何NotionPage）
-        is_first_run = await self._is_first_run()
-        if is_first_run:
-            logger.info("🆕 首次运行程序，Neo4j中没有任何页面数据，执行全量同步")
-            return True
-        
-        # 获取上次全量同步时间
-        last_full_sync = await self._get_last_full_sync_time()
-        
-        if last_full_sync is None:
-            logger.info("🆕 没有全量同步记录，需要全量同步")
-            return True
-        
-        # 检查是否超过12小时 (处理Neo4j DateTime类型和时区问题)
-        if hasattr(last_full_sync, 'to_native'):
-            # Neo4j DateTime转换为Python datetime
-            last_full_sync_native = last_full_sync.to_native()
-        else:
-            last_full_sync_native = last_full_sync
-        
-        # 确保两个datetime对象具有相同的时区信息
-        from datetime import timezone
-        now = datetime.now(timezone.utc)
-        if last_full_sync_native.tzinfo is None:
-            # 如果数据库时间没有时区，假设是UTC
-            last_full_sync_native = last_full_sync_native.replace(tzinfo=timezone.utc)
-        
-        # 检查是否需要全量同步（3天一次，北京时间凌晨4点）
-        days_since_last_full = (now - last_full_sync_native).total_seconds() / (24 * 3600)
-        
-        # 如果距离上次全量同步超过3天，需要全量同步
-        if days_since_last_full >= 3:
-            logger.info(f"⏰ 距离上次全量同步已过 {days_since_last_full:.1f} 天，需要全量同步")
-            return True
-        
-        # 检查是否是北京时间凌晨4点（允许在4:00-4:30之间执行）
-        from datetime import timezone, timedelta
-        beijing_tz = timezone(timedelta(hours=8))
-        beijing_now = now.astimezone(beijing_tz)
-        current_hour = beijing_now.hour
-        current_minute = beijing_now.minute
-        
-        # 如果距离上次全量同步超过1天，且当前是北京时间凌晨4点
-        if days_since_last_full >= 1 and current_hour == 4 and current_minute < 30:
-            logger.info(f"🌙 北京时间凌晨4点定时全量同步 (距离上次 {days_since_last_full:.1f} 天)")
-            return True
-        
-        logger.info(f"⚡ 距离上次全量同步 {days_since_last_full:.1f} 天，执行增量同步")
-        return False
+    # 旧的同步决策逻辑已删除，现在只支持手动全量同步
     
     async def _is_first_run(self) -> bool:
         """检查是否为首次运行（Neo4j中是否有任何NotionPage数据）"""
@@ -305,32 +242,7 @@ class SyncService:
             logger.exception(f"全量同步失败: {e}")
             return False
     
-    async def _run_incremental_sync(self) -> bool:
-        """执行增量同步"""
-        try:
-            # Get last sync time
-            last_sync_time = await self._get_last_sync_time()
-            
-            # Scan for changed pages
-            changed_pages = await self.scanner.scan_for_changes(last_sync_time)
-            
-            if not changed_pages:
-                logger.info("No changes detected, sync cycle complete")
-                return True
-            
-            logger.info(f"Found {len(changed_pages)} pages to sync")
-            
-            # Update graph with changes
-            sync_report = await self.updater.update_graph(changed_pages)
-            
-            # Log sync results
-            self._log_sync_results(sync_report)
-            
-            return True
-            
-        except Exception as e:
-            logger.exception(f"增量同步失败: {e}")
-            return False
+    # 增量同步已废弃，改用Notion Webhook实时推送
     
     async def _cleanup_deleted_pages(self, current_pages):
         """清理已删除的页面"""

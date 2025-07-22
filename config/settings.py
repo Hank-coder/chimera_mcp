@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     app_environment: str = "development"
     debug: bool = True
+    device: str = Field(default="SERVER", description="Device type: LOCAL or SERVER")
     
     # Neo4j Configuration
     neo4j_uri: str = Field(default="neo4j://127.0.0.1:7687", description="Neo4j database URI")
@@ -26,6 +27,12 @@ class Settings(BaseSettings):
     # Notion Configuration
     notion_token: str = Field(..., description="Notion API token - MUST be set via environment variable")
     notion_base_url: str = Field(default="https://www.notion.so", description="Notion base URL")
+    notion_webhook_secret: Optional[str] = Field(default=None, description="Notion webhook secret for signature verification")
+    
+    @property
+    def NOTION_WEBHOOK_SECRET(self) -> Optional[str]:
+        """Compatibility property for NOTION_WEBHOOK_SECRET"""
+        return self.notion_webhook_secret
     
     # Gemini Configuration
     gemini_api_key: str = Field(..., description="Gemini API key - MUST be set via environment variable")

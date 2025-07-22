@@ -264,18 +264,22 @@ class GraphUpdater:
             # Get all pages from graph
             query = """
             MATCH (p:NotionPage)
-            RETURN p.notion_id as notion_id, p.internal_links as internal_links, 
+            RETURN p.notionId as notion_id, p.internal_links as internal_links, 
                    p.mentions as mentions, p.database_relations as database_relations,
                    p.tags as tags
             """
             
-            result = await self.graph_client._graphiti.driver.execute_query(query)
+            async with self.graph_client._driver.session() as session:
+                result = await session.run(query)
+                records = []
+                async for record in result:
+                    records.append(record)
             
             # Delete existing relationships
             await self._delete_all_relationships()
             
             # Recreate relationships
-            for record in result.records:
+            for record in records:
                 try:
                     # Create a minimal page metadata object
                     page_metadata = NotionPageMetadata(
@@ -312,8 +316,9 @@ class GraphUpdater:
             "MATCH ()-[r:HAS_TAG]->() DELETE r"
         ]
         
-        for query in queries:
-            await self.graph_client._graphiti.driver.execute_query(query)
+        async with self.graph_client._driver.session() as session:
+            for query in queries:
+                await session.run(query)
     
     async def validate_graph_integrity(self) -> Dict[str, Any]:
         """
@@ -332,29 +337,34 @@ class GraphUpdater:
             RETURN count(p) as orphaned_count
             """
             
-            orphaned_result = await self.graph_client._graphiti.driver.execute_query(orphaned_query)
-            orphaned_count = orphaned_result.records[0]["orphaned_count"]
-            
-            # Check for broken relationships
-            broken_query = """
-            MATCH (p1:NotionPage)-[r]->(p2:NotionPage)
-            WHERE p1.notion_id IS NULL OR p2.notion_id IS NULL
-            RETURN count(r) as broken_count
-            """
-            
-            broken_result = await self.graph_client._graphiti.driver.execute_query(broken_query)
-            broken_count = broken_result.records[0]["broken_count"]
-            
-            # Check for duplicate pages
-            duplicate_query = """
-            MATCH (p:NotionPage)
-            WITH p.notion_id as id, count(p) as count
-            WHERE count > 1
-            RETURN count(*) as duplicate_count
-            """
-            
-            duplicate_result = await self.graph_client._graphiti.driver.execute_query(duplicate_query)
-            duplicate_count = duplicate_result.records[0]["duplicate_count"]
+            async with self.graph_client._driver.session() as session:
+                # Check for orphaned nodes
+                result = await session.run(orphaned_query)
+                record = await result.single()
+                orphaned_count = record["orphaned_count"] if record else 0
+                
+                # Check for broken relationships
+                broken_query = """
+                MATCH (p1:NotionPage)-[r]->(p2:NotionPage)
+                WHERE p1.notionId IS NULL OR p2.notionId IS NULL
+                RETURN count(r) as broken_count
+                """
+                
+                result = await session.run(broken_query)
+                record = await result.single()
+                broken_count = record["broken_count"] if record else 0
+                
+                # Check for duplicate pages
+                duplicate_query = """
+                MATCH (p:NotionPage)
+                WITH p.notionId as id, count(p) as count
+                WHERE count > 1
+                RETURN count(*) as duplicate_count
+                """
+                
+                result = await session.run(duplicate_query)
+                record = await result.single()
+                duplicate_count = record["duplicate_count"] if record else 0
             
             validation_results = {
                 "orphaned_pages": orphaned_count,

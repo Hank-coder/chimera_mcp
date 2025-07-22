@@ -174,7 +174,7 @@ class ChimeraFastMCPServer:
                         message="Authentication failed"
                     )
                 
-                logger.info(f"Intent search request: {params.query}")
+                logger.debug(f"Intent search request: {params.query}")
                 
                 result = await search_user_intent(
                     user_input=params.query,
@@ -183,7 +183,7 @@ class ChimeraFastMCPServer:
                     expansion_depth=params.expansion_depth
                 )
                 
-                logger.info(f"Intent search completed, success: {result.success}")
+                logger.debug(f"Intent search completed, success: {result.success}")
                 
                 # 处理搜索结果，提取路径内容（参考demo_intent_search.py）
                 if result.success and result.confidence_paths:
@@ -309,7 +309,7 @@ class ChimeraFastMCPServer:
                         message="Authentication failed"
                     )
                 
-                logger.info(f"Relationship search request: {params.query}")
+                logger.debug(f"Relationship search request: {params.query}")
                 
                 # 调用微信关系搜索
                 result = await search_wechat_relationships(
@@ -317,7 +317,7 @@ class ChimeraFastMCPServer:
                     max_results=params.max_results
                 )
                 
-                logger.info(f"Relationship search completed, success: {result.success}")
+                logger.debug(f"Relationship search completed, success: {result.success}")
                 
                 if result.success:
                     return ChimeraResult(
