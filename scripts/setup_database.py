@@ -81,7 +81,7 @@ async def create_indices(graph_client: GraphitiClient):
         "CREATE INDEX notion_page_title_index IF NOT EXISTS FOR (p:NotionPage) ON (p.title)",
         "CREATE INDEX notion_page_type_index IF NOT EXISTS FOR (p:NotionPage) ON (p.type)",
         "CREATE INDEX notion_page_last_edited_index IF NOT EXISTS FOR (p:NotionPage) ON (p.last_edited_time)",
-        "CREATE INDEX notion_page_parent_index IF NOT EXISTS FOR (p:NotionPage) ON (p.parent_id)",
+        "CREATE INDEX notion_page_parent_index IF NOT EXISTS FOR (p:NotionPage) ON (p.parentId)",
         
         # Index on Tag properties
         "CREATE INDEX tag_name_index IF NOT EXISTS FOR (t:Tag) ON (t.name)",

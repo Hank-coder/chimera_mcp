@@ -128,7 +128,7 @@ class GraphitiClient:
                     tags=page_metadata.tags,
                     lastEditedTime=page_metadata.last_edited_time,
                     url=page_metadata.url,
-                    parentId=page_metadata.parent_id,
+                    parentId=page_metadata.parentId,
                     level=page_metadata.level
                 )
                 
@@ -144,12 +144,13 @@ class GraphitiClient:
             logger.error(f"Error upserting page {page_metadata.notion_id}: {e}")
             return False
     
-    async def create_relationships(self, page_metadata: NotionPageMetadata) -> bool:
+    async def create_relationships(self, page_metadata: NotionPageMetadata, max_retries: int = 3) -> bool:
         """
         Create relationships for a page based on its metadata.
         
         Args:
             page_metadata: Page metadata containing relationship information
+            max_retries: Maximum number of retries for failed relationships
             
         Returns:
             True if successful, False otherwise
@@ -157,73 +158,147 @@ class GraphitiClient:
         if not self._initialized:
             await self.initialize()
             
+        failed_relationships = []
+        
         try:
             async with self._driver.session() as session:
                 # Create CHILD_OF relationship
-                if page_metadata.parent_id:
-                    await self._create_relationship(
-                        session,
-                        page_metadata.notion_id,
-                        page_metadata.parent_id,
-                        RelationType.CHILD_OF
-                    )
+                if page_metadata.parentId:
+                    try:
+                        await self._create_relationship(
+                            session,
+                            page_metadata.notion_id,
+                            page_metadata.parentId,
+                            RelationType.CHILD_OF
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to create CHILD_OF relationship for {page_metadata.notion_id}: {e}")
+                        failed_relationships.append({
+                            'type': 'CHILD_OF',
+                            'source': page_metadata.notion_id,
+                            'target': page_metadata.parentId,
+                            'error': str(e)
+                        })
                 
                 # Create LINKS_TO relationships
                 for link in page_metadata.internal_links:
                     target_id = await self._find_page_by_title(session, link)
                     if target_id:
-                        await self._create_relationship(
-                            session,
-                            page_metadata.notion_id,
-                            target_id,
-                            RelationType.LINKS_TO
-                        )
+                        try:
+                            await self._create_relationship(
+                                session,
+                                page_metadata.notion_id,
+                                target_id,
+                                RelationType.LINKS_TO
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to create LINKS_TO relationship for {page_metadata.notion_id} -> {target_id}: {e}")
+                            failed_relationships.append({
+                                'type': 'LINKS_TO',
+                                'source': page_metadata.notion_id,
+                                'target': target_id,
+                                'error': str(e)
+                            })
                 
                 # Create MENTIONS relationships
                 for mention in page_metadata.mentions:
                     target_id = await self._find_page_by_title(session, mention)
                     if target_id:
-                        await self._create_relationship(
-                            session,
-                            page_metadata.notion_id,
-                            target_id,
-                            RelationType.MENTIONS
-                        )
+                        try:
+                            await self._create_relationship(
+                                session,
+                                page_metadata.notion_id,
+                                target_id,
+                                RelationType.MENTIONS
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to create MENTIONS relationship for {page_metadata.notion_id} -> {target_id}: {e}")
+                            failed_relationships.append({
+                                'type': 'MENTIONS',
+                                'source': page_metadata.notion_id,
+                                'target': target_id,
+                                'error': str(e)
+                            })
                 
                 # Create RELATED_TO relationships
                 for relation_id in page_metadata.database_relations:
-                    await self._create_relationship(
-                        session,
-                        page_metadata.notion_id,
-                        relation_id,
-                        RelationType.RELATED_TO
-                    )
+                    try:
+                        await self._create_relationship(
+                            session,
+                            page_metadata.notion_id,
+                            relation_id,
+                            RelationType.RELATED_TO
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to create RELATED_TO relationship for {page_metadata.notion_id} -> {relation_id}: {e}")
+                        failed_relationships.append({
+                            'type': 'RELATED_TO',
+                            'source': page_metadata.notion_id,
+                            'target': relation_id,
+                            'error': str(e)
+                        })
                 
                 # Create HAS_TAG relationships
                 for tag in page_metadata.tags:
-                    await self._create_tag_relationship(session, page_metadata.notion_id, tag)
+                    try:
+                        await self._create_tag_relationship(session, page_metadata.notion_id, tag)
+                    except Exception as e:
+                        logger.warning(f"Failed to create HAS_TAG relationship for {page_metadata.notion_id} -> {tag}: {e}")
+                        failed_relationships.append({
+                            'type': 'HAS_TAG',
+                            'source': page_metadata.notion_id,
+                            'target': tag,
+                            'error': str(e)
+                        })
                 
-                logger.debug(f"Created relationships for page {page_metadata.notion_id}")
-                return True
+                if failed_relationships:
+                    logger.error(f"Page {page_metadata.notion_id} ({page_metadata.title}) had {len(failed_relationships)} failed relationships")
+                    for rel in failed_relationships:
+                        logger.error(f"  Failed {rel['type']}: {rel['source']} -> {rel['target']} ({rel['error']})")
+                    return False
+                else:
+                    logger.debug(f"Successfully created all relationships for page {page_metadata.notion_id}")
+                    return True
             
         except Exception as e:
-            logger.error(f"Error creating relationships for page {page_metadata.notion_id}: {e}")
+            logger.error(f"Error in create_relationships for page {page_metadata.notion_id}: {e}")
             return False
     
     async def _create_relationship(self, session, source_id: str, target_id: str, relation_type: RelationType):
         """Create a relationship between two pages."""
-        query = f"""
+        
+        # First verify both nodes exist
+        verification_query = """
+        MATCH (source:NotionPage {notionId: $source_id})
+        OPTIONAL MATCH (target:NotionPage {notionId: $target_id})
+        RETURN source.title as source_title, target.title as target_title
+        """
+        
+        result = await session.run(verification_query, source_id=source_id, target_id=target_id)
+        record = await result.single()
+        
+        if not record:
+            raise Exception(f"Source page {source_id} not found")
+        
+        if not record["target_title"]:
+            raise Exception(f"Target page {target_id} not found when creating {relation_type.value} relationship from {record['source_title']}")
+        
+        # Now create the relationship
+        create_query = f"""
         MATCH (source:NotionPage {{notionId: $source_id}})
         MATCH (target:NotionPage {{notionId: $target_id}})
         MERGE (source)-[r:{relation_type.value}]->(target)
         SET r.createdAt = datetime()
+        RETURN r
         """
         
-        await session.run(
-            query,
-            source_id=source_id,
-            target_id=target_id
-        )
+        result = await session.run(create_query, source_id=source_id, target_id=target_id)
+        record = await result.single()
+        
+        if not record:
+            raise Exception(f"Failed to create {relation_type.value} relationship between {source_id} and {target_id}")
+        
+        logger.debug(f"Created {relation_type.value} relationship: {source_id} -> {target_id}")
     
     async def _create_tag_relationship(self, session, page_id: str, tag: str):
         """Create a relationship between a page and a tag."""
@@ -506,6 +581,120 @@ class GraphitiClient:
                 last_sync=datetime.now()
             )
     
+    async def retry_failed_relationships(self, max_attempts: int = 3) -> int:
+        """
+        Retry creating failed CHILD_OF relationships.
+        This handles cases where parent pages weren't synced yet when child pages were processed.
+        
+        Returns:
+            Number of relationships successfully created
+        """
+        if not self._initialized:
+            await self.initialize()
+            
+        try:
+            async with self._driver.session() as session:
+                # Find pages with parentId but missing CHILD_OF relationships
+                result = await session.run("""
+                    MATCH (child:NotionPage)
+                    WHERE child.parentId IS NOT NULL
+                    AND NOT EXISTS { MATCH (child)-[:CHILD_OF]->(:NotionPage) }
+                    RETURN child.notionId as child_id, 
+                           child.title as child_title,
+                           child.parentId as parent_id
+                    LIMIT 100
+                """)
+                
+                missing_relations = []
+                async for record in result:
+                    missing_relations.append({
+                        'child_id': record['child_id'],
+                        'child_title': record['child_title'],
+                        'parent_id': record['parent_id']
+                    })
+                
+                if not missing_relations:
+                    logger.debug("No missing CHILD_OF relationships found")
+                    return 0
+                
+                logger.info(f"Found {len(missing_relations)} missing CHILD_OF relationships, attempting to fix...")
+                
+                fixed_count = 0
+                for rel in missing_relations:
+                    try:
+                        await self._create_relationship(
+                            session,
+                            rel['child_id'],
+                            rel['parent_id'],
+                            RelationType.CHILD_OF
+                        )
+                        fixed_count += 1
+                        logger.debug(f"Fixed CHILD_OF relationship: {rel['child_title']} -> parent")
+                    except Exception as e:
+                        logger.warning(f"Still cannot create CHILD_OF relationship for {rel['child_title']}: {e}")
+                
+                logger.info(f"Successfully fixed {fixed_count}/{len(missing_relations)} missing CHILD_OF relationships")
+                return fixed_count
+                
+        except Exception as e:
+            logger.error(f"Error in retry_failed_relationships: {e}")
+            return 0
+    
+    async def validate_relationship_consistency(self) -> Dict[str, Any]:
+        """
+        Validate relationship consistency in the graph.
+        Check for pages that should have relationships but don't.
+        
+        Returns:
+            Dictionary with validation results
+        """
+        if not self._initialized:
+            await self.initialize()
+            
+        try:
+            async with self._driver.session() as session:
+                # Check for missing CHILD_OF relationships
+                missing_child_result = await session.run("""
+                    MATCH (child:NotionPage)
+                    WHERE child.parentId IS NOT NULL
+                    AND NOT EXISTS { MATCH (child)-[:CHILD_OF]->(:NotionPage) }
+                    RETURN count(child) as missing_child_of_count
+                """)
+                
+                record = await missing_child_result.single()
+                missing_child_of = record['missing_child_of_count'] if record else 0
+                
+                # Check for orphaned CHILD_OF relationships (pointing to non-existent parents)
+                orphaned_result = await session.run("""
+                    MATCH (child:NotionPage)-[:CHILD_OF]->(parent:NotionPage)
+                    WHERE child.parentId <> parent.notionId OR child.parentId IS NULL
+                    RETURN count(child) as orphaned_relationships
+                """)
+                
+                record = await orphaned_result.single()
+                orphaned_relationships = record['orphaned_relationships'] if record else 0
+                
+                # Check for level inconsistencies
+                level_inconsistent_result = await session.run("""
+                    MATCH (child:NotionPage)-[:CHILD_OF]->(parent:NotionPage)
+                    WHERE child.level <= parent.level
+                    RETURN count(child) as level_inconsistencies
+                """)
+                
+                record = await level_inconsistent_result.single()
+                level_inconsistencies = record['level_inconsistencies'] if record else 0
+                
+                return {
+                    "missing_child_of_relationships": missing_child_of,
+                    "orphaned_relationships": orphaned_relationships,
+                    "level_inconsistencies": level_inconsistencies,
+                    "is_consistent": missing_child_of == 0 and orphaned_relationships == 0 and level_inconsistencies == 0
+                }
+                
+        except Exception as e:
+            logger.error(f"Error validating relationship consistency: {e}")
+            return {"error": str(e), "is_consistent": False}
+
     async def health_check(self) -> bool:
         """Check if the graph database is accessible."""
         try:

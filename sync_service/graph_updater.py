@@ -58,6 +58,13 @@ class GraphUpdater:
                     
                     logger.info(f"Processed batch {i//self._batch_size + 1}/{(len(pages) + self._batch_size - 1)//self._batch_size}")
                 
+                # Retry failed relationships
+                logger.info("Attempting to fix missing CHILD_OF relationships...")
+                fixed_relationships = await self.graph_client.retry_failed_relationships()
+                if fixed_relationships > 0:
+                    report.relationships_created += fixed_relationships
+                    logger.info(f"Fixed {fixed_relationships} missing relationships in post-processing")
+                
                 # Update timestamps
                 report.end_time = datetime.now()
                 report.status = "completed" if not report.errors else "completed_with_errors"

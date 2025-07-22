@@ -70,7 +70,7 @@ class TestNotionGetAllFiles:
                     tags=["test"],
                     last_edited_time=datetime(2024, 1, 1),
                     url="https://www.notion.so/test-page-id-1",
-                    parent_id=None,
+                    parentId=None,
                     internal_links=[],
                     mentions=[],
                     database_relations=[]
@@ -127,7 +127,7 @@ class TestNotionGetAllFiles:
                             tags=[],
                             last_edited_time=datetime(2024, 1, 2),
                             url="https://www.notion.so/new-page-id",
-                            parent_id=None,
+                            parentId=None,
                             internal_links=[],
                             mentions=[],
                             database_relations=[]

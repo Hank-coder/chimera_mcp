@@ -129,7 +129,7 @@ class NotionExtractor:
                 tags=tags,
                 last_edited_time=last_edited_time,
                 url=url,
-                parent_id=parent_id,
+                parentId=parent_id,
                 level=level,
                 internal_links=internal_links,
                 mentions=mentions,

@@ -30,7 +30,7 @@ class NotionPageMetadata(BaseModel):
     tags: List[str] = Field(default_factory=list, description="Page tags for topic clustering")
     last_edited_time: datetime = Field(..., description="Last modification time for incremental sync")
     url: str = Field(..., description="Direct URL to the Notion page")
-    parent_id: Optional[str] = Field(None, description="Parent page ID for hierarchy")
+    parentId: Optional[str] = Field(None, description="Parent page ID for hierarchy")
     level: int = Field(default=0, description="Page hierarchy level (0=root, 1=child, 2=grandchild, etc.)")
     
     # Extracted relationship data
@@ -141,7 +141,7 @@ def create_notion_page_from_api(page_data: Dict[str, Any]) -> NotionPageMetadata
         tags=extract_tags_from_page(page_data),
         last_edited_time=datetime.fromisoformat(page_data["last_edited_time"].replace("Z", "+00:00")),
         url=page_data["url"],
-        parent_id=extract_parent_id_from_page(page_data)
+        parentId=extract_parent_id_from_page(page_data)
     )
 
 

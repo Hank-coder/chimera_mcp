@@ -167,9 +167,9 @@ class NotionWebhookHandler:
                     await self._upsert_page_in_transaction(tx, metadata)
                     
                     # 4. 创建父子关系
-                    if metadata.parent_id:
+                    if metadata.parentId:
                         await self._create_parent_relationship_in_transaction(
-                            tx, page_id, metadata.parent_id
+                            tx, page_id, metadata.parentId
                         )
                     
                     # 5. 创建其他关系（标签、内链等）
@@ -438,7 +438,7 @@ class NotionWebhookHandler:
                 tags=tags,
                 last_edited_time=last_edited_time,
                 url=url,
-                parent_id=parent_id,
+                parentId=parent_id,
                 level=level,
                 internal_links=internal_links,
                 mentions=mentions,
@@ -487,17 +487,59 @@ class NotionWebhookHandler:
             tags=metadata.tags,
             lastEditedTime=metadata.last_edited_time,
             url=metadata.url,
-            parentId=metadata.parent_id,
+            parentId=metadata.parentId,
             level=metadata.level
         )
     
     async def _create_parent_relationship_in_transaction(self, tx, page_id: str, parent_id: str):
-        """在事务中创建父子关系"""
+        """在事务中创建父子关系，带验证"""
+        # 首先验证两个节点都存在
+        verification_result = await tx.run("""
+            MATCH (child:NotionPage {notionId: $page_id})
+            OPTIONAL MATCH (parent:NotionPage {notionId: $parent_id})
+            RETURN child.title as child_title, parent.title as parent_title
+        """, page_id=page_id, parent_id=parent_id)
+        
+        record = await verification_result.single()
+        if not record:
+            raise Exception(f"Child page {page_id} not found in graph")
+        
+        if not record["parent_title"]:
+            # 父页面不存在，先尝试从 Notion API 获取并创建
+            logger.warning(f"Parent page {parent_id} not found for child {record['child_title']}, attempting to fetch from Notion")
+            
+            try:
+                # 从 Notion API 获取父页面
+                parent_page_data = await self.notion_client.client.pages.retrieve(page_id=parent_id)
+                parent_metadata = await self._extract_page_metadata(parent_page_data)
+                
+                if parent_metadata:
+                    # 创建父页面
+                    await self._upsert_page_in_transaction(tx, parent_metadata)
+                    logger.info(f"Successfully created missing parent page: {parent_metadata.title}")
+                    
+                    # 如果父页面也有父页面，递归创建关系
+                    if parent_metadata.parentId:
+                        try:
+                            await self._create_parent_relationship_in_transaction(
+                                tx, parent_id, parent_metadata.parentId
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to create grandparent relationship for {parent_metadata.title}: {e}")
+                else:
+                    raise Exception(f"Failed to extract metadata for parent page {parent_id}")
+                    
+            except Exception as e:
+                raise Exception(f"Cannot create CHILD_OF relationship: parent page {parent_id} not found and cannot be fetched from Notion: {e}")
+        
+        # 现在创建关系
         await tx.run("""
             MATCH (child:NotionPage {notionId: $page_id})
             MATCH (parent:NotionPage {notionId: $parent_id})
             MERGE (child)-[:CHILD_OF]->(parent)
         """, page_id=page_id, parent_id=parent_id)
+        
+        logger.debug(f"Created CHILD_OF relationship: {record['child_title']} -> {record.get('parent_title', 'parent')}")
     
     async def _create_relationships_in_transaction(self, tx, metadata: NotionPageMetadata):
         """在事务中创建其他关系"""
