@@ -373,8 +373,8 @@ def main():
     parser.add_argument("--port", type=int, default=8081, help="服务器端口")
     parser.add_argument("--debug", action="store_true", help="启用调试模式")
     parser.add_argument("--ssl", action="store_true", help="启用HTTPS/SSL")
-    parser.add_argument("--ssl-cert", default="./config/cyhank.com.crt", help="SSL证书文件路径")
-    parser.add_argument("--ssl-key", default="./config/cyhank.com.key", help="SSL私钥文件路径")
+    parser.add_argument("--ssl-cert", default="config/cyhank.com.crt", help="SSL证书文件路径")
+    parser.add_argument("--ssl-key", default="config/cyhank.com.key", help="SSL私钥文件路径")
     
     args = parser.parse_args()
     
@@ -393,22 +393,24 @@ def main():
     logger.info(f"Environment: {settings.app_environment}")
     
     # SSL配置
-    ssl_config = None
-    if args.ssl:
+    ssl_config = {}
+    if settings.device.upper() == "SERVER":
         ssl_cert_path = Path(args.ssl_cert)
         ssl_key_path = Path(args.ssl_key)
-        
+
         if not ssl_cert_path.exists() or not ssl_key_path.exists():
-            logger.error(f"SSL certificate files not found:")
+            logger.error(f"❌ SSL certificate files not found:")
             logger.error(f"  Cert: {ssl_cert_path} (exists: {ssl_cert_path.exists()})")
             logger.error(f"  Key: {ssl_key_path} (exists: {ssl_key_path.exists()})")
             sys.exit(1)
-            
+
         ssl_config = {
             "ssl_keyfile": str(ssl_key_path),
             "ssl_certfile": str(ssl_cert_path)
         }
-        logger.info(f"✅ SSL configured: {ssl_cert_path}")
+        logger.info(f"✅ SERVER 模式启用 SSL: {ssl_cert_path}")
+    else:
+        logger.info("🏠 LOCAL 模式，不启用 SSL")
     
     try:
         # 启动服务器
@@ -417,14 +419,11 @@ def main():
             "host": args.host,
             "port": args.port,
             "reload": args.debug,
-            "log_level": "info" if not args.debug else "debug"
+            "log_level": "info" if not args.debug else "debug",
+            **ssl_config,  # 自动添加 ssl 参数（如果是 SERVER 模式）
         }
-        
-        # 添加SSL配置
-        if ssl_config:
-            uvicorn_args.update(ssl_config)
-            
         uvicorn.run(**uvicorn_args)
+
     except KeyboardInterrupt:
         logger.info("🛑 Server stopped by user")
         sys.exit(0)
