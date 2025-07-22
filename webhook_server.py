@@ -374,8 +374,8 @@ def main():
     parser.add_argument("--port", type=int, default=8081, help="服务器端口")
     parser.add_argument("--debug", action="store_true", help="启用调试模式")
     parser.add_argument("--ssl", action="store_true", help="启用HTTPS/SSL")
-    parser.add_argument("--ssl-cert", default="ssl/webhook-cert.pem", help="SSL证书文件路径")
-    parser.add_argument("--ssl-key", default="ssl/webhook-key.pem", help="SSL私钥文件路径")
+    parser.add_argument("--ssl-cert", default="/config/cyhank.com.crt", help="SSL证书文件路径")
+    parser.add_argument("--ssl-key", default="/config/cyhank.com.key", help="SSL私钥文件路径")
     
     args = parser.parse_args()
     

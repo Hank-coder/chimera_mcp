@@ -27,7 +27,12 @@ async def webhook(request: Request):
     return {"status": "received"}
 
 def start_server():
-    uvicorn.run(app, host="0.0.0.0", port=8081)
+    if env == "server":
+        uvicorn.run(app, host="0.0.0.0", port=8081,
+                    ssl_certfile="/config/cyhank.com.crt",
+                    ssl_keyfile="/config/cyhank.com.key")
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=8081)
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -69,9 +74,9 @@ def main():
     if env == "local":
         ngrok_proc = start_ngrok()
     else:
-        ip = get_local_ip()
-        print(f"🔗 [server] 请在 Notion 中配置：")
-        print(f"http://{ip}:8081/notion/webhook")
+        # ip = get_local_ip()
+        print(f"🔗 [server] 请在 Notion 中配置 Webhook：")
+        print(f"https://cyhank.com:8081/notion/webhook")
         ngrok_proc = None
 
     try:
