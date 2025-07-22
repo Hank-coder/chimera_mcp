@@ -29,8 +29,8 @@ async def webhook(request: Request):
 def start_server():
     if env == "server":
         uvicorn.run(app, host="0.0.0.0", port=8081,
-                    ssl_certfile="/config/cyhank.com.crt",
-                    ssl_keyfile="/config/cyhank.com.key")
+                    ssl_certfile="./config/cyhank.com.crt",
+                    ssl_keyfile="./config/cyhank.com.key")
     else:
         uvicorn.run(app, host="0.0.0.0", port=8081)
 
