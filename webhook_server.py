@@ -20,7 +20,6 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 import uvicorn
-from sklearn.externals.array_api_compat import device
 
 from config.settings import get_settings, settings
 from config.logging import setup_logging
