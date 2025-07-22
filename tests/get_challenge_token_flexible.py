@@ -76,7 +76,7 @@ def main():
     else:
         # ip = get_local_ip()
         print(f"🔗 [server] 请在 Notion 中配置 Webhook：")
-        print(f"https://cyhank.com:8081/notion/webhook")
+        print(f"https://cyhank.com/notion/webhook")
         ngrok_proc = None
 
     try:
