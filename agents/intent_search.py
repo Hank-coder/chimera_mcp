@@ -255,18 +255,38 @@ class IntentSearchEngine:
                 content = content[:-3]
             content = content.strip()
             
-            # 解析JSON响应
-            evaluation_data = json.loads(content)
-            return ConfidenceEvaluationResponse(**evaluation_data)
+            # 验证内容不为空
+            if not content:
+                raise ValueError("Gemini返回的内容为空")
+            
+            # 解析JSON响应（增强错误处理）
+            try:
+                evaluation_data = json.loads(content)
+                if not isinstance(evaluation_data, dict):
+                    raise ValueError("JSON解析结果不是字典类型")
+                return ConfidenceEvaluationResponse(**evaluation_data)
+            except json.JSONDecodeError as json_err:
+                print(f"JSON解析错误: {json_err}")
+                print(f"原始响应内容: {repr(content)}")
+                raise ValueError(f"无法解析JSON响应: {json_err}")
+            except (TypeError, ValueError) as model_err:
+                print(f"模型构建错误: {model_err}")
+                print(f"解析后的数据: {evaluation_data if 'evaluation_data' in locals() else 'N/A'}")
+                raise ValueError(f"无法构建响应模型: {model_err}")
             
         except Exception as e:
             print(f"Gemini评估失败: {e}")
+            print(f"错误类型: {type(e).__name__}")
+            if hasattr(e, '__traceback__'):
+                import traceback
+                print(f"错误堆栈: {traceback.format_exc()}")
+            
             # 返回默认评估（所有路径都是中等置信度）
             default_evaluations = [
                 {
                     'document_index': i,
                     'confidence_score': 0.5,
-                    'reasoning': '自动评估失败，使用默认置信度'
+                    'reasoning': f'自动评估失败，使用默认置信度。错误: {str(e)[:100]}'
                 }
                 for i in range(len(candidate_paths))
             ]
@@ -454,10 +474,11 @@ class IntentSearchEngine:
             # 同步调用Gemini API（异步版本可能有问题）
             response = self.gemini_model.generate_content(
                 prompt,
-                generation_config={
-                    'temperature': request.temperature,
-                    'max_output_tokens': request.max_output_tokens
-                }
+                generation_config=genai.types.GenerationConfig(
+                    temperature=request.temperature,
+                    max_output_tokens=request.max_output_tokens,
+                    response_mime_type="application/json"  # 确保返回JSON格式
+                )
             )
             
             # 检查响应
