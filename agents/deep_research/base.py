@@ -65,7 +65,7 @@ class BaseAgent(ABC):
                     prompt,
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.1,
-                        max_output_tokens=3000
+                        max_output_tokens = 5000
                     )
                 )
                 
@@ -73,6 +73,8 @@ class BaseAgent(ABC):
                 self.processing_time += elapsed
                 
                 if not response or not response.text:
+                    logger.error(f"[Simple] Gemini响应详情: response={bool(response)}, response.text={getattr(response, 'text', 'N/A')}")
+                    logger.error(f"[Simple] Prompt前200字符: {repr(prompt[:200])}")
                     raise ValueError("Gemini返回空响应")
                 
                 # logger.debug(f"Gemini API调用成功，耗时: {elapsed:.2f}s")
@@ -104,7 +106,11 @@ class BaseAgent(ABC):
                 self.processing_time += elapsed
                 
                 if not response or not response.text:
+                    logger.error(f"[JSON] Gemini响应详情: response={bool(response)}, response.text={getattr(response, 'text', 'N/A')}")
+                    logger.error(f"[JSON] Prompt前100字符: {repr(prompt[:100])}")
                     raise Exception("Gemini返回空响应")
+                
+                logger.debug(f"[JSON] Gemini响应成功，text前100字符: {repr(response.text[:100])}")
                     
                 return response.text
                 
@@ -118,8 +124,13 @@ class BaseAgent(ABC):
         如果JSON解析失败，返回包含原始文本的字典
         """
         try:
-            # 调用Gemini并强制JSON格式
-            text_response = await self._call_gemini_json(prompt)
+            # 首先尝试强制JSON格式
+            try:
+                text_response = await self._call_gemini_json(prompt)
+            except Exception as json_error:
+                logger.warning(f"JSON模式调用失败，回退到普通模式: {json_error}")
+                # 回退到普通模式
+                text_response = await self.call_gemini_simple(prompt)
             
             # 尝试解析为JSON
             import json
@@ -153,9 +164,13 @@ class BaseAgent(ABC):
                 result = json.loads(clean_text)
                 return result
                 
-            except json.JSONDecodeError:
-                # JSON解析失败，返回包含原始文本的结构
-                logger.warning(f"JSON解析失败，返回原始文本")
+            except json.JSONDecodeError as e:
+                # JSON解析失败，打印详细错误信息用于调试
+                logger.error(f"JSON解析失败: {e}")
+                logger.error(f"原始响应全文: {repr(text_response)}")
+                logger.error(f"清理后文本全文: {repr(clean_text)}")
+                logger.error(f"这看起来是response_mime_type='application/json'导致的不完整响应，改用普通模式")
+                # 返回包含原始文本的结构
                 return {"text_response": text_response}
                 
         except Exception as e:
@@ -318,10 +333,12 @@ class BatchProcessor:
         return processed_results
 
 
-# 工具函数
+# 工具函数 计算簇！
 def calculate_optimal_clusters(page_count: int, max_workers: int = 6) -> int:
     """计算最优簇数量"""
-    if page_count <= 10:
+    if page_count <= 4:
+        return min(2, max_workers)
+    elif page_count <= 10:
         return min(3, max_workers)
     elif page_count <= 30:
         return min(4, max_workers)

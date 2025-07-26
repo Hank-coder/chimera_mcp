@@ -35,7 +35,7 @@ class ContextEngineeringDirector(BaseAgent):
     
     def __init__(self):
         super().__init__(agent_id="context_director")
-        self.worker_count = 4  # 固定4个Worker，降低并发压力
+        self.worker_count = 5 # 最大并行subagent 工蜂
         self.batch_processor = BatchProcessor(max_concurrent=self.worker_count)
         
     async def orchestrate_research(self, request: DeepResearchRequest) -> ResearchContext:
@@ -65,18 +65,18 @@ class ContextEngineeringDirector(BaseAgent):
             
             # 3. 语义分簇
             target_clusters = calculate_optimal_clusters(len(candidate_pages), self.worker_count)
-            clusters = await self.semantic_clustering(candidate_pages, target_clusters, request.research_complexity)
+            clusters, cluster_themes = await self.semantic_clustering(candidate_pages, target_clusters, request.research_complexity)
             
             logger.info(f"语义分簇完成：生成 {len(clusters)} 个主题簇")
             
             # 4. 4个Worker并发处理
-            cluster_summaries = await self.dispatch_workers(clusters, request)
+            cluster_summaries = await self.dispatch_workers(clusters, cluster_themes, request)
             
             logger.info(f"Worker处理完成：{len(cluster_summaries)} 个簇摘要")
             
             # 5. 直接拼接摘要，跳过复杂的Reduce步骤
             research_context = await self.create_research_context_from_summaries(
-                cluster_summaries, request
+                cluster_summaries, cluster_themes, request
             )
             
             # 6. 最终验证和优化
@@ -98,19 +98,15 @@ class ContextEngineeringDirector(BaseAgent):
         pages: List[Dict[str, Any]], 
         target_clusters: int,
         complexity: str
-    ) -> List[List[Dict[str, Any]]]:
+    ) -> tuple[List[List[Dict[str, Any]]], List[str]]:
         """
         语义分簇：根据页面内容进行主题聚类
         """
         try:
             # logger.info(f"开始语义分簇：{len(pages)} 个页面 -> {target_clusters} 个簇")
             
-            # 创建分簇prompt
-            clustering_prompt = self.prompts.create_clustering_prompt(
-                complexity=complexity,
-                page_metadata=pages,
-                target_clusters=target_clusters
-            )
+            # 创建简化的分簇prompt
+            clustering_prompt = self._create_simple_clustering_prompt(pages, target_clusters)
             
             # 调用Gemini进行分簇
             clustering_result = await self.call_gemini_structured(clustering_prompt)
@@ -131,16 +127,21 @@ class ContextEngineeringDirector(BaseAgent):
                 logger.warning("语义分簇失败，使用智能标签分簇")
                 return self._tag_based_clustering(pages, target_clusters)
             
-            # 构建页面ID到页面数据的映射
-            page_map = {page["notion_id"]: page for page in pages}
-            
-            # 根据分簇结果组织页面
+            # 根据分簇结果组织页面（使用索引）
             clusters = []
             for cluster_info in clusters_data:
                 cluster_pages = []
-                for page_id in cluster_info.get("page_ids", []):
-                    if page_id in page_map:
-                        cluster_pages.append(page_map[page_id])
+                for page_index in cluster_info.get("page_ids", []):
+                    try:
+                        # 将字符串索引转换为整数
+                        index = int(page_index)
+                        if 0 <= index < len(pages):
+                            cluster_pages.append(pages[index])
+                    except (ValueError, IndexError):
+                        # 如果是notion_id格式，回退到原来的逻辑
+                        page_map = {page["notion_id"]: page for page in pages}
+                        if page_index in page_map:
+                            cluster_pages.append(page_map[page_index])
                 
                 if cluster_pages:
                     clusters.append(cluster_pages)
@@ -163,13 +164,60 @@ class ContextEngineeringDirector(BaseAgent):
                     # 如果没有有效簇，创建一个新簇
                     clusters.append(unassigned_pages)
             
+            # 提取主题名称
+            cluster_themes = []
+            for cluster_info in clusters_data:
+                theme = cluster_info.get("theme", f"主题簇_{len(cluster_themes)+1}")
+                cluster_themes.append(theme)
+            
+            # 确保主题数量与簇数量匹配
+            while len(cluster_themes) < len(clusters):
+                cluster_themes.append(f"主题簇_{len(cluster_themes)+1}")
+            
             # logger.info(f"语义分簇完成：{[len(cluster) for cluster in clusters]}")
-            return clusters
+            return clusters, cluster_themes
             
         except Exception as e:
-            logger.error(f"语义分簇失败: {e}")
+            logger.warning(f"语义分簇失败，使用标签分簇: {str(e)[:50]}...")
             # 降级策略：使用智能标签分簇
-            return self._tag_based_clustering(pages, target_clusters)
+            clusters = self._tag_based_clustering(pages, target_clusters)
+            # 为降级簇生成默认主题名称
+            themes = [f"主题簇_{i+1}" for i in range(len(clusters))]
+            return clusters, themes
+    
+    def _create_simple_clustering_prompt(self, pages: List[Dict], target_clusters: int) -> str:
+        """创建简化的语义分簇prompt"""
+        
+        # 格式化页面信息
+        pages_info = []
+        for i, page in enumerate(pages):
+            info = f'{i}. "{page.get("title", "Unknown")}" - Tags: {page.get("tags", [])}'
+            pages_info.append(info)
+        
+        pages_str = "\n".join(pages_info)
+        
+        return f"""根据页面标题和标签，将以下页面分成 {target_clusters} 个主题相关的组：
+
+{pages_str}
+
+要求：
+1. 相似主题的页面分在同组
+2. 各组页面数量尽量均衡
+3. 每组页面在逻辑上相关
+
+请返回JSON格式：
+{{
+    "clustering_result": {{
+        "clusters": [
+            {{
+                "cluster_id": "cluster_1",
+                "theme": "主题名称",
+                "page_ids": ["0", "1"],
+                "description": "分组理由"
+            }}
+        ]
+    }}
+}}"""
     
     def _tag_based_clustering(self, pages: List[Dict], target_clusters: int) -> List[List[Dict]]:
         """基于标签和层级的智能分簇"""
@@ -238,6 +286,7 @@ class ContextEngineeringDirector(BaseAgent):
     async def dispatch_workers(
         self, 
         clusters: List[List[Dict]], 
+        cluster_themes: List[str],
         request: DeepResearchRequest
     ) -> List[str]:
         """
@@ -260,9 +309,12 @@ class ContextEngineeringDirector(BaseAgent):
                     research_purpose=request.purpose
                 )
                 
+                # 使用真实的主题名称，如果没有则使用默认名称
+                theme_name = cluster_themes[i] if i < len(cluster_themes) else f"主题簇_{i+1}"
+                
                 task = worker.process_cluster(
                     cluster_pages=cluster_pages,
-                    cluster_theme=f"主题簇_{i+1}",
+                    cluster_theme=theme_name,
                     max_pages=request.max_pages
                 )
                 worker_tasks.append(task)
@@ -351,6 +403,7 @@ class ContextEngineeringDirector(BaseAgent):
     async def create_research_context_from_summaries(
         self,
         cluster_summaries: List[str],
+        cluster_themes: List[str],
         request: DeepResearchRequest
     ) -> ResearchContext:
         """
@@ -422,9 +475,25 @@ class ContextEngineeringDirector(BaseAgent):
         for i, summary in enumerate(cluster_summaries):
             basic_summary += f"簇 {i+1}：{summary[:200]}...\n\n"
         
+        # 创建 TopicCluster 对象
+        topic_clusters = []
+        for i, (summary, theme) in enumerate(zip(cluster_summaries, cluster_themes)):
+            # 确保有主题名称
+            actual_theme = theme if theme and theme != f"主题簇_{i+1}" else f"主题簇_{i+1}"
+            
+            topic_cluster = TopicCluster(
+                cluster_id=f"cluster_{i}",
+                theme=actual_theme,
+                pages=[],  # 简化版本不包含详细页面分析
+                cluster_synthesis=summary,
+                representative_quotes=[],
+                cross_references=[]
+            )
+            topic_clusters.append(topic_cluster)
+        
         return ResearchContext(
             executive_summary=basic_summary,
-            topic_clusters=[],
+            topic_clusters=topic_clusters,
             top_pages=[],
             key_insights=[
                 f"共处理了 {len(cluster_summaries)} 个主题簇",
