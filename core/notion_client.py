@@ -728,7 +728,7 @@ class NotionClient:
             else:
                 # 页面存在但内容为空
                 page_title = page_info.get('title', 'Unknown') if page_info else 'Unknown'
-                empty_content = f"页面 '{page_title}' 当前没有内容，这可能是一个空白页面或仅包含标题的页面。"
+                empty_content = f"页面 '{page_title}' 没有内容, 作为路径参考。"
                 return empty_content, latest_timestamp
         except Exception as e:
             error_msg = str(e)
@@ -870,4 +870,206 @@ class NotionClient:
         
         info = await self.extractor.get_page_basic_info(normalized_id)
         return info  # 如果页面不存在就返回None，不要返回假信息
+    
+    async def validate_page_structure(self, page_id: str) -> Dict[str, Any]:
+        """
+        验证页面结构是否适合Deep Research分析
+        
+        Args:
+            page_id: 页面ID
+            
+        Returns:
+            验证结果字典，包含valid, child_count, error等字段
+        """
+        try:
+            # 规范化页面ID
+            normalized_id = self._normalize_page_id(page_id)
+            
+            # 1. 检查页面是否存在
+            page_info = await self.extractor.get_page_basic_info(normalized_id)
+            if not page_info:
+                return {
+                    "valid": False,
+                    "error": f"页面 {page_id} 不存在或无访问权限",
+                    "child_count": 0
+                }
+            
+            # 2. 获取子页面数量
+            child_count = await self._count_child_pages(normalized_id)
+            
+            # 3. 验证是否适合深度研究
+            if child_count < 2:
+                return {
+                    "valid": False,
+                    "error": f"页面子页面不足（{child_count}个），至少需要2个子页面才能进行深度研究",
+                    "child_count": child_count
+                }
+            
+            return {
+                "valid": True,
+                "child_count": child_count,
+                "page_title": page_info.get("title", "Unknown"),
+                "page_url": page_info.get("url", "")
+            }
+            
+        except Exception as e:
+            logger.error(f"页面结构验证失败 {page_id}: {e}")
+            return {
+                "valid": False,
+                "error": f"验证过程出错: {str(e)}",
+                "child_count": 0
+            }
+    
+    async def _count_child_pages(self, page_id: str) -> int:
+        """
+        计算页面的直接子页面数量
+        
+        Args:
+            page_id: 页面ID
+            
+        Returns:
+            子页面数量
+        """
+        try:
+            await self.extractor._rate_limit_wait()
+            
+            # 获取页面的所有子块
+            blocks = await self.extractor.client.blocks.children.list(
+                block_id=page_id,
+                page_size=100  # 足够获取大部分子页面
+            )
+            
+            child_page_count = 0
+            for block in blocks.get("results", []):
+                if block.get("type") == "child_page":
+                    child_page_count += 1
+            
+            # 如果有更多页面，继续获取
+            if blocks.get("has_more", False):
+                next_cursor = blocks.get("next_cursor")
+                while next_cursor:
+                    await self.extractor._rate_limit_wait()
+                    next_blocks = await self.extractor.client.blocks.children.list(
+                        block_id=page_id,
+                        start_cursor=next_cursor,
+                        page_size=100
+                    )
+                    
+                    for block in next_blocks.get("results", []):
+                        if block.get("type") == "child_page":
+                            child_page_count += 1
+                    
+                    if next_blocks.get("has_more", False):
+                        next_cursor = next_blocks.get("next_cursor")
+                    else:
+                        break
+            
+            return child_page_count
+            
+        except Exception as e:
+            logger.warning(f"计算子页面数量失败 {page_id}: {e}")
+            return 0
+    
+    async def get_child_pages_bfs(self, root_page_id: str, max_depth: int = 3, max_pages: int = 20) -> List[Dict[str, Any]]:
+        """
+        BFS遍历获取子页面结构
+        
+        Args:
+            root_page_id: 根页面ID
+            max_depth: 最大遍历深度
+            max_pages: 最大页面数限制
+            
+        Returns:
+            页面元数据列表，包含层级信息
+        """
+        try:
+            normalized_root_id = self._normalize_page_id(root_page_id)
+            
+            # BFS队列：(page_id, depth, parent_id)
+            queue = [(normalized_root_id, 0, None)]
+            visited = set()
+            result_pages = []
+            
+            while queue and len(result_pages) < max_pages:  # 限制最大页面数
+                current_page_id, current_depth, parent_id = queue.pop(0)
+                
+                if current_page_id in visited or current_depth > max_depth:
+                    continue
+                    
+                visited.add(current_page_id)
+                
+                # 获取当前页面信息
+                page_info = await self.extractor.get_page_basic_info(current_page_id)
+                if not page_info:
+                    continue
+                
+                # 添加到结果（跳过根页面）
+                if current_depth > 0:
+                    page_metadata = {
+                        "notion_id": current_page_id,
+                        "title": page_info["title"],
+                        "url": page_info["url"],
+                        "tags": page_info.get("tags", []),
+                        "last_edited_time": page_info["last_edited_time"],
+                        "depth": current_depth,
+                        "parent_id": parent_id
+                    }
+                    result_pages.append(page_metadata)
+                
+                # 如果还没达到最大深度，获取子页面
+                if current_depth < max_depth:
+                    child_pages = await self._get_direct_child_pages(current_page_id)
+                    for child_id in child_pages:
+                        if child_id not in visited:
+                            queue.append((child_id, current_depth + 1, current_page_id))
+            
+            logger.info(f"BFS遍历完成：从 {root_page_id} 获取 {len(result_pages)} 个页面（深度≤{max_depth}）")
+            return result_pages
+            
+        except Exception as e:
+            logger.error(f"BFS遍历失败 {root_page_id}: {e}")
+            return []
+    
+    async def _get_direct_child_pages(self, page_id: str) -> List[str]:
+        """
+        获取页面的直接子页面ID列表
+        
+        Args:
+            page_id: 页面ID
+            
+        Returns:
+            子页面ID列表
+        """
+        try:
+            child_page_ids = []
+            
+            await self.extractor._rate_limit_wait()
+            blocks = await self.extractor.client.blocks.children.list(
+                block_id=page_id,
+                page_size=100
+            )
+            
+            # 处理第一页结果
+            for block in blocks.get("results", []):
+                if block.get("type") == "child_page":
+                    child_page_ids.append(block["id"])
+            
+            # 处理分页结果
+            while blocks.get("has_more", False):
+                await self.extractor._rate_limit_wait()
+                blocks = await self.extractor.client.blocks.children.list(
+                    block_id=page_id,
+                    start_cursor=blocks.get("next_cursor"),
+                    page_size=100
+                )
+                
+                for block in blocks.get("results", []):
+                    if block.get("type") == "child_page":
+                        child_page_ids.append(block["id"])
+            
+            return child_page_ids
+            
+        except Exception as e:
+            logger.warning(f"获取直接子页面失败 {page_id}: {e}")
+            return []
     

@@ -21,9 +21,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agents.intent_search import search_user_intent
+from agents.deep_research import ContextEngineeringDirector
 from utils.fastmcp_utils import get_bearer_token, get_path_contents_async
 from config.settings import get_settings
 from core.wechat_search import search_wechat_relationships
+from core.models import DeepResearchRequest
 
 
 # Pydantic模型定义
@@ -100,6 +102,45 @@ class RelationshipSearchInput(BaseModel):
         )
     )
 
+class DeepResearchInput(BaseModel):
+    """深度研究输入模型（用于生成大模型研究上下文）"""
+    
+    page_id: str = Field(..., description="根页面Notion ID")
+    
+    purpose: str = Field(
+        ...,
+        description=(
+            "研究目的和关注点。例如：\n"
+            "- '了解机器学习项目的实施方法'\n"
+            "- '分析产品设计的核心原则'\n"
+            "- '总结团队管理的最佳实践'\n"
+            "- '研究技术架构的演进思路'"
+        )
+    )
+    
+    max_pages: int = Field(
+        default=10,
+        ge=5,
+        le=20,
+        description=(
+            "返回的最大页面数量（5-20）。建议：\n"
+            "- 快速概览：5-8页\n"
+            "- 标准研究：10-12页\n" 
+            "- 深度分析：15-20页"
+        )
+    )
+    
+    research_complexity: str = Field(
+        default="standard",
+        description=(
+            "研究复杂度，决定分析深度和总结风格：\n"
+            "- overview: 高层概览，突出核心结论和趋势\n"
+            "- standard: 平衡分析，核心观点+支撑证据\n" 
+            "- detailed: 深度分析，包含方法论和案例\n"
+            "- comprehensive: 学术级分析，完整理论框架"
+        )
+    )
+
 class ChimeraResult(BaseModel):
     """通用结果模型"""
     success: bool = Field(..., description="操作是否成功")
@@ -138,9 +179,9 @@ class ChimeraFastMCPServer:
         """设置MCP工具"""
 
         @self.mcp.tool(
-            title="🧠 个人记忆搜索（Notion）",
+            title="文档标准搜索（Notion）",
             description=(
-                    "这是我（陈宇函）的个人知识库“Chimera”搜索工具，"
+                    "这是我（陈宇函）的个人知识库“Chimera”**简单/标准搜索**工具，侧重于单文档。"
                     "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
                     "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
                     " - query (字符串，必填)：搜索关键词或短语（如有时间信息请包含），示例：\"上周碳中和计划\"\n"
@@ -325,7 +366,7 @@ class ChimeraFastMCPServer:
                         data={
                             "relationships": result.episodes,
                             "formatted_answer": result.formatted_answer,
-                            "query_analysis": result.query_analysis.dict() if result.query_analysis else None,
+                            "query_analysis": result.query_analysis.model_dump() if result.query_analysis else None,
                             "processing_time_ms": result.processing_time_ms
                         },
                         message=f"找到 {len(result.episodes)} 个相关关系"
@@ -347,6 +388,103 @@ class ChimeraFastMCPServer:
                     success=False,
                     data={"relationships": [], "formatted_answer": "搜索过程中发生错误"},
                     message=f"关系搜索失败: {str(e)}"
+                )
+        
+        @self.mcp.tool(
+            title="文档深度搜索（Notion）",
+            description=(
+                    "这是我（陈宇函）的Notion个人知识库**深度搜索**工具,侧重于多文档，为研究RAG Context Engineering打造!\n\n"
+                    "**触发条件**：当用户问题包含“深度研究”或“仔细分析”等相关关键词时，调用此工具。\n\n"
+                    "**核心功能**：\n"
+                    "1. 自动验证页面结构（检查子页面层级≤4）。\n"
+                    "2. 智能语义分簇（4个Worker并行分析页面内容）。\n"
+                    "3. 生成研究级结构化上下文（适用于Context Engineering）。\n\n"
+                    "**参数说明**：\n"
+                    "- `page_id` (str): 研究起点页面ID（Notion页面UUID）。\n"
+                    "- `purpose` (str): 研究目的和关注重点，决定聚合逻辑。\n"
+                    "- `max_pages` (int): 处理的页面数量（根据需要选择 5-20）。\n"
+                    "- `research_complexity` (str): 研究复杂度，控制分析深度与风格,"
+                    "可选：overview|standard|detailed|comprehensive"
+
+                    "**🧪 示例**：\n"
+                    "用户提出请求：`请对「page_id」这个页面做一次深度知识提炼，用于后续代码生成支持。`\n\n"
+                    "调用方式：\n"
+                    "```json\n"
+                    "{\n"
+                    "  \"page_id\": \"「page_id」\",\n"
+                    "  \"purpose\": \"提取结构化 Agent 规划模式供模型调用\",\n"
+                    "  \"max_pages\": 10,\n"
+                    "  \"research_complexity\": \"detailed\"\n"
+                    "}\n"
+                    "```"
+            )
+        )
+        async def deep_research(params: DeepResearchInput, ctx: Context) -> ChimeraResult:
+            """
+            智能深度研究工具
+            params: DeepResearchInput 是业务输入参数，由客户端/大模型传入；
+            ctx: Context 是上下文参数，由 MCP 框架自动注入。
+            """
+            try:
+                # 认证检查
+                if not self._validate_auth(ctx):
+                    return ChimeraResult(
+                        success=False,
+                        data={"research_context": None},
+                        message="Authentication failed"
+                    )
+                
+                logger.debug(f"Deep research request: page_id={params.page_id}, complexity={params.research_complexity}")
+                
+                # 创建内部请求（添加固定参数）
+                internal_request = DeepResearchRequest(
+                    page_id=params.page_id,
+                    purpose=params.purpose,  # 必需字段，直接传递
+                    max_pages=params.max_pages,
+                    research_complexity=params.research_complexity,
+                    depth=4,  # 固定
+                    max_workers=4  # 固定
+                )
+                
+                # 执行深度研究
+                director = ContextEngineeringDirector()
+                research_context = await director.orchestrate_research(internal_request)
+                
+                logger.debug(f"Deep research completed successfully")
+                
+                return ChimeraResult(
+                    success=True,
+                    data={
+                        "research_context": research_context.model_dump(),
+                        "complexity_applied": params.research_complexity,
+                        "pages_analyzed": params.max_pages,
+                        "processing_metadata": {
+                            "workers_used": 4,
+                            "depth_traversed": 4,
+                            "api_calls_made": director.api_call_count,
+                            "processing_time_seconds": director.processing_time,
+                            "clusters_formed": len(research_context.topic_clusters),
+                            "top_pages_selected": len(research_context.top_pages)
+                        }
+                    },
+                    message=f"研究完成：{params.research_complexity}级分析，{len(research_context.top_pages)}个顶级页面，{len(research_context.topic_clusters)}个主题簇"
+                )
+                
+            except ValueError as ve:
+                # 页面验证失败等业务逻辑错误
+                logger.warning(f"Deep research validation failed: {ve}")
+                return ChimeraResult(
+                    success=False,
+                    data={"research_context": None},
+                    message=f"研究验证失败: {str(ve)}"
+                )
+                
+            except Exception as e:
+                logger.exception(f"Error in deep_research: {e}")
+                return ChimeraResult(
+                    success=False,
+                    data={"research_context": None},
+                    message=f"深度研究失败: {str(e)}"
                 )
     
     def run(self, host: str = "0.0.0.0", port: int = 3000):

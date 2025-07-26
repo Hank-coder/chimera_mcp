@@ -255,7 +255,7 @@ class GeminiAPIRequest(BaseModel):
     prompt: str = Field(..., description="提示文本")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0, description="温度参数")
     max_output_tokens: int = Field(default=2000, ge=1, le=8192, description="最大输出token数")
-    model_name: str = Field(default="gemini-2.0-flash", description="模型名称")
+    model_name: str = Field(default="gemini-2.5-flash", description="模型名称")
 
 
 class GeminiAPIResponse(BaseModel):
@@ -264,3 +264,154 @@ class GeminiAPIResponse(BaseModel):
     content: Optional[str] = Field(None, description="响应内容")
     error: Optional[str] = Field(None, description="错误信息")
     usage_info: Optional[Dict[str, Any]] = Field(None, description="使用信息")
+
+
+# Deep Research 相关模型
+class DeepResearchRequest(BaseModel):
+    """Deep Research内部请求模型"""
+    page_id: str = Field(..., description="根页面ID")
+    purpose: str = Field(..., description="研究目的和关注点，用于关联度判断")
+    max_pages: int = Field(default=10, ge=5, le=20, description="返回页面数量，最大20")
+    research_complexity: str = Field(
+        default="standard", 
+        description="研究复杂度：overview|standard|detailed|comprehensive"
+    )
+    
+    # 内部固定参数
+    depth: int = Field(default=4, description="固定遍历深度")
+    max_workers: int = Field(default=6, description="固定Worker数量")
+
+
+class ResearchComplexityConfig(BaseModel):
+    """研究复杂度配置"""
+    complexity_type: str = Field(..., description="复杂度类型")
+    summary_style: str = Field(..., description="摘要风格")
+    focus_areas: List[str] = Field(..., description="关注领域")
+    compression_ratio: float = Field(..., ge=0.1, le=1.0, description="压缩比例")
+    detail_level: str = Field(..., description="详细程度")
+    target_summary_length: int = Field(..., description="目标摘要长度（字符数）")
+
+
+class PageAnalysis(BaseModel):
+    """页面分析结果"""
+    notion_id: str = Field(..., description="页面ID")
+    title: str = Field(..., description="页面标题")
+    content: str = Field(..., description="原始内容")
+    summary: str = Field(..., description="AI生成的页面摘要")
+    key_points: List[str] = Field(..., description="关键要点列表")
+    importance_score: float = Field(..., description="重要性评分，0.0-1.0之间")
+    relevance_score: float = Field(..., description="与研究目的的关联度评分，0.0-1.0之间")
+    word_count: int = Field(..., description="字数统计")
+    supporting_quotes: List[str] = Field(..., description="支撑引用")
+    research_value: Dict[str, str] = Field(..., description="研究价值评估")
+
+
+class TopicCluster(BaseModel):
+    """主题簇分析结果"""
+    cluster_id: str = Field(..., description="簇ID")
+    theme: str = Field(..., description="主题描述")
+    pages: List[PageAnalysis] = Field(..., description="页面分析列表")
+    cluster_synthesis: str = Field(..., description="簇级综合摘要")
+    representative_quotes: List[str] = Field(..., description="代表性引用")
+    cross_references: List[str] = Field(..., description="交叉引用")
+
+
+class ResearchFramework(BaseModel):
+    """研究框架"""
+    problem_definition: str = Field(..., description="问题定义")
+    theoretical_foundation: str = Field(..., description="理论基础")
+    methodology_insights: str = Field(..., description="方法论洞察")
+    expected_contributions: str = Field(..., description="预期贡献")
+
+
+class ResearchContext(BaseModel):
+    """Deep Research最终输出模型"""
+    executive_summary: str = Field(..., description="执行摘要")
+    topic_clusters: List[TopicCluster] = Field(..., description="主题簇列表")
+    top_pages: List[PageAnalysis] = Field(..., description="顶级页面分析")
+    key_insights: List[str] = Field(..., description="核心洞察")
+    supporting_evidence: List[Dict[str, Any]] = Field(default_factory=list, description="支撑证据")
+    research_framework: ResearchFramework = Field(..., description="研究框架")
+    future_directions: List[str] = Field(default_factory=list, description="未来方向")
+    research_scope: Dict[str, Any] = Field(default_factory=dict, description="研究范围元信息")
+
+
+class DeepResearchResponse(BaseModel):
+    """Deep Research MCP响应模型"""
+    success: bool = Field(..., description="研究是否成功")
+    research_context: Optional[ResearchContext] = Field(None, description="研究上下文")
+    complexity_applied: str = Field(..., description="应用的复杂度")
+    pages_analyzed: int = Field(..., description="分析的页面数")
+    processing_metadata: Dict[str, Any] = Field(default_factory=dict, description="处理元数据")
+    error: Optional[str] = Field(None, description="错误信息")
+
+
+# Gemini structured output schemas
+class ClusteringResult(BaseModel):
+    """语义分簇结果schema"""
+    clusters: List[Dict[str, Any]] = Field(description="分簇结果列表")
+    reasoning: str = Field(description="分簇理由")
+
+class ClusteringResponse(BaseModel):
+    """分簇响应schema"""
+    clustering_result: ClusteringResult = Field(description="分簇结果")
+
+class PageAnalysisResult(BaseModel):
+    """页面分析结果schema"""
+    summary: str = Field(description="页面摘要")
+    key_points: List[str] = Field(description="关键要点")
+    importance_score: float = Field(description="重要性评分，0.0-1.0之间")
+    relevance_score: float = Field(description="关联度评分，0.0-1.0之间")
+    supporting_quotes: List[str] = Field(description="支撑引用")
+    research_value: Dict[str, str] = Field(description="研究价值")
+
+class PageAnalysisResponse(BaseModel):
+    """页面分析响应schema"""
+    page_analysis: PageAnalysisResult = Field(..., description="页面分析结果")
+
+class ClusterSynthesisResult(BaseModel):
+    """簇综合结果schema"""
+    synthesis: str = Field(description="簇综合摘要")
+    key_themes: List[str] = Field(description="关键主题")
+    cross_references: List[str] = Field(description="交叉引用")
+    methodology_insights: str = Field(description="方法论洞察")
+
+class ClusterSynthesisResponse(BaseModel):
+    """簇综合响应schema"""
+    cluster_synthesis: ClusterSynthesisResult = Field(..., description="簇综合结果")
+
+# 研究复杂度配置常量
+RESEARCH_COMPLEXITY_CONFIGS = {
+    "overview": ResearchComplexityConfig(
+        complexity_type="overview",
+        summary_style="executive_summary",
+        focus_areas=["核心结论", "主要趋势", "关键洞察"],
+        compression_ratio=0.3,
+        detail_level="high_level",
+        target_summary_length=800
+    ),
+    "standard": ResearchComplexityConfig(
+        complexity_type="standard", 
+        summary_style="balanced_analysis",
+        focus_areas=["核心观点", "支撑证据", "实用建议"],
+        compression_ratio=0.5,
+        detail_level="medium",
+        target_summary_length=1200
+    ),
+    "detailed": ResearchComplexityConfig(
+        complexity_type="detailed",
+        summary_style="thorough_analysis", 
+        focus_areas=["理论基础", "方法论", "案例分析", "实践应用"],
+        compression_ratio=0.6,
+        detail_level="comprehensive",
+        target_summary_length=1800
+    ),
+    "comprehensive": ResearchComplexityConfig(
+        complexity_type="comprehensive",
+        summary_style="academic_research",
+        focus_areas=["理论框架", "文献脉络", "方法论", "实证分析", "创新贡献", "未来方向"],
+        compression_ratio=0.8, 
+        detail_level="exhaustive",
+        target_summary_length=2500
+    )
+}

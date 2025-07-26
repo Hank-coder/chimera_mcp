@@ -3,7 +3,7 @@ WeChat关系图谱数据模型
 专门用于处理微信聊天数据的结构化模型
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
@@ -36,7 +36,7 @@ class WeChatUser(BaseModel):
     wechat_id: Optional[str] = Field(None, description="微信ID（如果可获取）")
     user_type: str = Field(default="user", description="用户类型")
     
-    @validator('cleaned_name')
+    @field_validator('cleaned_name')
     def validate_cleaned_name(cls, v):
         """验证清洗后的昵称"""
         if not v or len(v.strip()) == 0:
@@ -52,7 +52,7 @@ class WeChatGroup(BaseModel):
     members: List[WeChatUser] = Field(default_factory=list, description="群组成员列表")
     topic: Optional[str] = Field(None, description="群组主题")
     
-    @validator('group_name')
+    @field_validator('group_name')
     def validate_group_name(cls, v):
         """验证群组名称"""
         if not v or len(v.strip()) == 0:
@@ -68,7 +68,7 @@ class WeChatRelationship(BaseModel):
     context: Optional[str] = Field(None, description="关系上下文，如群组名称")
     confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="关系置信度")
     
-    @validator('person_a', 'person_b')
+    @field_validator('person_a', 'person_b')
     def validate_person_names(cls, v):
         """验证人员名称"""
         if not v or len(v.strip()) == 0:
@@ -83,7 +83,7 @@ class WeChatActivity(BaseModel):
     group_context: str = Field(..., description="活动上下文（群组名称）")
     activity_type: str = Field(default="group_chat", description="活动类型")
     
-    @validator('participant', 'group_context')
+    @field_validator('participant', 'group_context')
     def validate_activity_fields(cls, v):
         """验证活动字段"""
         if not v or len(v.strip()) == 0:
@@ -100,14 +100,14 @@ class WeChatEpisode(BaseModel):
     source_file: str = Field(..., description="来源文件路径")
     created_at: datetime = Field(default_factory=datetime.now, description="创建时间")
     
-    @validator('content')
+    @field_validator('content')
     def validate_content(cls, v):
         """验证Episode内容"""
         if not v or len(v.strip()) == 0:
             raise ValueError("Episode内容不能为空")
         return v.strip()
     
-    @validator('episode_id')
+    @field_validator('episode_id')
     def validate_episode_id(cls, v):
         """验证Episode ID"""
         if not v or len(v.strip()) == 0:
@@ -122,7 +122,7 @@ class WeChatChatMessage(BaseModel):
     timestamp: datetime = Field(..., description="消息时间戳")
     message_type: str = Field(default="text", description="消息类型")
     
-    @validator('sender')
+    @field_validator('sender')
     def validate_sender(cls, v):
         """验证发送者"""
         if not v or len(v.strip()) == 0:
@@ -138,7 +138,7 @@ class WeChatChatFile(BaseModel):
     messages: List[WeChatChatMessage] = Field(default_factory=list, description="聊天消息列表")
     processed: bool = Field(default=False, description="是否已处理")
     
-    @validator('file_path')
+    @field_validator('file_path')
     def validate_file_path(cls, v):
         """验证文件路径"""
         if not v or len(v.strip()) == 0:
@@ -154,7 +154,7 @@ class WeChatDataProcessor(BaseModel):
     deduplication_enabled: bool = Field(default=True, description="是否启用去重")
     activity_deduplication_enabled: bool = Field(default=False, description="活动是否去重")
     
-    @validator('input_directory', 'output_directory')
+    @field_validator('input_directory', 'output_directory')
     def validate_directories(cls, v):
         """验证目录路径"""
         if not v or len(v.strip()) == 0:
@@ -188,7 +188,7 @@ class RelationshipSearchRequest(BaseModel):
     max_results: int = Field(default=5, ge=1, le=20, description="最大结果数")
     confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="置信度阈值")
     
-    @validator('query')
+    @field_validator('query')
     def validate_query(cls, v):
         """验证查询内容"""
         if not v or len(v.strip()) == 0:
