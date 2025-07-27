@@ -90,6 +90,11 @@ class CacheOptimizedPrompts:
             template=self._create_synthesis_template()
         )
 
+
+    """
+    暂未使用
+    """
+
     def _create_page_analysis_template(self) -> str:
         """创建页面分析模板（稳定前缀 + 动态内容）"""
         return f"""{self.STABLE_SYSTEM_PREFIX}

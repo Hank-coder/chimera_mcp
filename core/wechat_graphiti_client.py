@@ -26,9 +26,10 @@ from graphiti_core.cross_encoder.gemini_reranker_client import GeminiRerankerCli
 class WeChatGraphitiClient:
     """微信关系图谱 - Graphiti客户端"""
     
-    def __init__(self):
+    def __init__(self, use_2_0_flash: bool = False):
         self.graphiti: Optional[Graphiti] = None
         self._initialized = False
+        self._use_2_0_flash = use_2_0_flash
         
     async def initialize(self):
         """初始化Graphiti客户端"""
@@ -39,6 +40,9 @@ class WeChatGraphitiClient:
             # 配置Gemini
             genai.configure(api_key=settings.GEMINI_API_KEY)
             
+            # 根据参数选择模型
+            llm_model = "gemini-2.0-flash" if self._use_2_0_flash else settings.GEMINI_MODEL
+            
             # 使用简化的初始化方法
             self.graphiti = Graphiti(
                 uri=settings.neo4j_uri,
@@ -47,7 +51,7 @@ class WeChatGraphitiClient:
             llm_client=GeminiClient(
                 config=LLMConfig(
                     api_key=settings.GEMINI_API_KEY,
-                    model=settings.GEMINI_MODEL
+                    model=llm_model
                 )
             ),
             embedder=GeminiEmbedder(
@@ -66,7 +70,7 @@ class WeChatGraphitiClient:
             
             await self.graphiti.build_indices_and_constraints()
             self._initialized = True
-            logger.info("WeChat Graphiti客户端初始化成功")
+            logger.info(f"WeChat Graphiti客户端初始化成功，使用模型: {llm_model}")
             
         except Exception as e:
             logger.error(f"WeChat Graphiti客户端初始化失败: {e}")
