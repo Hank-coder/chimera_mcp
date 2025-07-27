@@ -10,6 +10,7 @@ import asyncio
 from datetime import datetime
 from agents.intent_search import search_user_intent
 from core.notion_client import NotionClient
+from utils.page_content_fetcher import get_page_content_for_intent_search
 
 
 async def get_path_contents(path_titles, path_ids):
@@ -19,12 +20,18 @@ async def get_path_contents(path_titles, path_ids):
     
     for i, (title, page_id) in enumerate(zip(path_titles, path_ids)):
         try:
-            content = await notion_client.get_page_content(page_id)
+            # 使用统一的页面内容获取器
+            content, timestamp, metadata = await get_page_content_for_intent_search(
+                page_id=page_id,
+                is_core_page=True,
+                max_length=8000
+            )
             path_contents.append({
                 "position": i,
                 "title": title,
                 "notion_id": page_id,
-                "content": content
+                "content": content,
+                "timestamp": timestamp
             })
         except Exception as e:
             path_contents.append({

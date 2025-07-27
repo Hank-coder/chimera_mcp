@@ -4,6 +4,7 @@ FastMCP 工具函数
 """
 from typing import List, Dict, Any
 from loguru import logger
+from utils.page_content_fetcher import get_page_content_for_intent_search
 
 
 def get_bearer_token(ctx):
@@ -75,18 +76,26 @@ async def get_path_contents_async(notion_client, path_titles: List[str], path_id
                 # 从缓存中获取时间信息（作为备用）
                 page_cache = cache_pages.get(page_id, {})
                 
-                # 根据参数决定是否提取文档内容
+                # 使用统一的页面内容获取器
                 if include_files:
-                    content, latest_timestamp = await notion_client.get_page_content(
-                        page_id, 
-                        include_files=True, 
+                    content, latest_timestamp, metadata = await get_page_content_for_intent_search(
+                        page_id=page_id,
+                        is_core_page=True,  # FastMCP通常用于核心页面
                         max_length=max_content_length
                     )
                 else:
-                    content, latest_timestamp = await notion_client.get_page_content(
-                        page_id, 
-                        include_files=False, 
-                        max_length=max_content_length
+                    # 不包含文件时，使用最小配置
+                    from utils.page_content_fetcher import PageContentFetcher
+                    fetcher = PageContentFetcher()
+                    config = {
+                        'include_files': False,
+                        'include_tables': True,  # 保留表格
+                        'max_content_length': max_content_length
+                    }
+                    content, latest_timestamp, metadata = await fetcher.get_page_content(
+                        page_id=page_id,
+                        config=config,
+                        purpose="fastmcp_minimal"
                     )
                 
                 # 使用实时时间戳，如果获取失败则使用缓存时间

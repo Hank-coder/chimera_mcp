@@ -17,6 +17,7 @@ from core.models import (
     PageAnalysisResponse,
     ClusterSynthesisResponse
 )
+from utils.page_content_fetcher import get_page_content_for_deep_research
 
 
 class OptimizedWorker(BaseAgent):
@@ -81,11 +82,10 @@ class OptimizedWorker(BaseAgent):
             
             async def fetch_single_page(page_meta: Dict[str, Any]) -> Dict[str, Any]:
                 try:
-                    # 获取页面内容（包含文档文件）
-                    content, timestamp = await self.notion_client.get_page_content(
-                        page_meta["notion_id"],
-                        include_files=True,
-                        max_length=8000  # 根据复杂度配置调整
+                    # 使用统一的页面内容获取器，包含表格和文档处理
+                    content, timestamp, metadata = await get_page_content_for_deep_research(
+                        page_id=page_meta["notion_id"],
+                        complexity=self.complexity_config.complexity_type
                     )
                     
                     return {

@@ -24,6 +24,7 @@ from core.models import (
 from core.graphiti_client import GraphitiClient
 from core.notion_client import NotionClient
 from prompts.intent_evaluation import IntentEvaluationPrompt
+from utils.page_content_fetcher import get_page_content_for_intent_search
 import google.generativeai as genai
 from config.settings import settings
 
@@ -389,12 +390,12 @@ class IntentSearchEngine:
             path_ids = []
             last_edited_time = ''
         
-        # 从Notion获取页面内容（包含文档文件）
+        # 使用统一的页面内容获取器（包含表格和文档处理）
         try:
-            page_content, latest_timestamp = await self.notion_client.get_page_content(
-                page_id, 
-                include_files=True,  # 提取文档内容
-                max_length=8000     # 限制内容长度
+            page_content, latest_timestamp, metadata = await get_page_content_for_intent_search(
+                page_id=page_id,
+                is_core_page=True,
+                max_length=8000
             )
             
             return CorePageResult(
@@ -442,11 +443,11 @@ class IntentSearchEngine:
             )
             
             for result in expanded_results:
-                # 获取页面内容（包含文档文件）
-                page_content, _ = await self.notion_client.get_page_content(
-                    result.get('page_id'),
-                    include_files=True,  # 提取文档内容
-                    max_length=6000     # 相关页面限制较小
+                # 使用统一的页面内容获取器（包含表格和文档处理）
+                page_content, _, metadata = await get_page_content_for_intent_search(
+                    page_id=result.get('page_id'),
+                    is_core_page=False,
+                    max_length=6000
                 )
                 
                 related_page = RelatedPageResult(
