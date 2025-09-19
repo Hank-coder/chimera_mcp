@@ -60,6 +60,7 @@ uv run python run_chimera.py
 - `NEO4J_PASSWORD`: Neo4j数据库密码
 - `GEMINI_API_KEY`: Google Gemini API密钥
 - `CHIMERA_API_KEY`: 系统Bearer认证密钥（可选）
+- `GEMINI_MODEL`： 默认使用的llm模型
 ## 1. 项目愿景与核心原则
 ### 1.1 项目愿景
 打造一个与我共生的、可进化的个人认知中枢。它不仅是过去记忆的存储器，更是未来创造的加速器，让 AI 成为真正懂我、助我成长的"第二大脑"。
@@ -123,12 +124,174 @@ uv run python run_chimera.py
 2. 遍历列表，在本地JSON缓存及Neo4j NotionPage节点更新属性 （分全量和增量同步）
 3. 对每个页面，根据其parent_id、[[...]]内链、relation属性、@提及和tags属性，分别MERGE对应的五种核心关系。
 
-### 4.2 MCP工具集（已实现）
-| 工具名称 | 参数 | 用途 |
-|----------|------|------|
-| intent_search | query: str, limit: int = 5 | 意图搜索。使用Gemini分析查询意图，返回最相关的页面信息结果。 |
-（待开发）
- | summary_search | query: str, limit: int = 5 | 获取NotionPage分支的总结  （如UNSW课程 Green项目文件总结...）|
+### 4.2 MCP工具集（已完整实现）✅
+
+#### 1. **🧠 个人记忆搜索（Notion）** - intent_search
+**核心功能**: 从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。
+
+**参数列表**:
+- `query` (str, 必填): 搜索关键词或短语，支持时间信息，例如："上周碳中和计划"
+- `confidence_threshold` (float, 默认0.8): 最低置信度阈值，范围0.5-1.0，用于过滤搜索结果
+- `search_results` (int, 默认3): 返回的最大搜索结果条数
+- `expansion_depth` (int, 默认1): 路径扩展深度，决定关联更多上下游页面的层级
+- `max_file_content_length` (int, 默认8000): 单个文档文件内容最大字符数限制
+- `max_page_content_length` (int, 默认10000): 单个Notion页面内容最大字符数限制
+
+**技术实现**:
+- 使用Gemini 2.0 Flash进行意图理解和查询优化
+- 基于Graphiti的语义搜索和关系遍历
+- 支持置信度评估和路径扩展
+- 自动提取文档文件内容（PDF、Word等）
+- 返回完整路径内容和时间戳信息
+
+**返回结果**:
+```json
+{
+  "success": true,
+  "data": {
+    "paths": [
+      {
+        "path": "Hank -> 项目管理 -> 碳中和计划",
+        "confidence": 0.95,
+        "last_edited_time": "2024-01-15T10:30:00Z",
+        "path_contents": [/* 路径中所有页面的详细内容 */],
+        "total_pages": 3
+      }
+    ],
+    "search_summary": "找到 3 条相关路径",
+    "intent_keywords": ["碳中和", "计划", "项目管理"]
+  },
+  "message": "找到 3 个相关结果"
+}
+```
+
+#### 2. **🌐 社交关系搜索（微信）** - relationship_search
+**核心功能**: 从微信聊天记录中查找人际关系、群组成员、活动参与等社交信息。
+
+**参数列表**:
+- `query` (str, 必填): 关系查询问题，可以是人名、项目名或关系问题
+- `max_results` (int, 默认3, 最大10): 返回的最大搜索结果数量
+
+**典型查询**:
+- 人名查询：例如 "敏哥"、"JZX"
+- 项目查询：例如 "GREEN项目"、"研发项目"
+- 关系查询：例如 "谁参与了GREEN项目"、"肥猫是什么角色"
+
+**技术实现**:
+- 基于实体识别和关系图谱的智能搜索
+- 支持模糊匹配和别名识别
+- 自动分析查询类型（人物、项目、关系）
+- 生成结构化的关系摘要
+
+**返回结果**:
+```json
+{
+  "success": true,
+  "data": {
+    "relationships": [/* 匹配的关系实体数组 */],
+    "formatted_answer": "敏哥在GREEN研发项目中担任核心开发角色，参与了架构设计和技术选型...",
+    "query_analysis": {
+      "query_type": "person_role",
+      "entities": ["敏哥", "GREEN项目"],
+      "intent": "查询人物在项目中的角色"
+    },
+    "processing_time_ms": 150
+  },
+  "message": "找到 3 个相关关系"
+}
+```
+
+#### 3. **🔬 智能深度研究** - deep_research ✨**新功能**
+**核心功能**: 基于根页面进行深度研究分析，生成大模型可直接使用的结构化研究上下文。
+
+**参数列表**:
+- `page_id` (str, 必填): 研究起点页面ID
+- `purpose` (str, 必填): 研究目的和关注点（后期用于工蜂判断内容关联度）
+- `max_pages` (int, 默认10, 范围5-20): 返回的最大页面数量
+- `research_complexity` (str, 默认"standard"): 研究复杂度级别
+
+**研究复杂度级别**:
+- `overview`: 高层概览，突出核心结论和趋势（压缩率30%，目标长度800字符）
+- `standard`: 平衡分析，核心观点+支撑证据（压缩率50%，目标长度1200字符）
+- `detailed`: 深度分析，包含方法论和案例（压缩率60%，目标长度1800字符）
+- `comprehensive`: 学术级分析，完整理论框架（压缩率80%，目标长度2500字符）
+
+**系统架构**:
+- **固定遍历深度**: 4层子页面（发现更多候选页面）
+- **固定Worker数量**: 4个并发智能体（优化并发性能）
+- **语义分簇**: 基于内容相似性自动分组
+- **关联度过滤**: 基于研究目的过滤无关内容（阈值0.2，降级0.1）
+- **KV Cache优化**: 稳定前缀设计，最大化缓存命中率
+
+**技术实现**:
+- **Director-Worker架构**: 1个总控智能体 + 4个处理工蜂
+- **多Agent协作**: 语义分簇 → 并发处理 → 关联度过滤 → 综合分析
+- **Purpose-driven过滤**: 每个Worker根据研究目的评估内容关联度
+- **结构化压缩**: 保持信息完整性的同时优化token使用
+- **错误恢复**: 完整的降级策略和容错机制
+
+**返回结果**:
+```json
+{
+  "success": true,
+  "data": {
+    "research_context": {
+      "executive_summary": "基于standard模式的综合摘要，整合了6个主题簇的核心观点...",
+      "topic_clusters": [
+        {
+          "cluster_id": "worker_0",
+          "theme": "主题簇_1",
+          "pages": [/* 页面分析结果数组 */],
+          "cluster_synthesis": "该簇的400-600字综合分析...",
+          "representative_quotes": ["代表性引用1", "代表性引用2"],
+          "cross_references": ["与其他主题的关联说明"]
+        }
+      ],
+      "top_pages": [/* 按重要性排序的顶级页面分析 */],
+      "key_insights": [
+        "洞察1：跨主题的重要发现或趋势",
+        "洞察2：具有指导意义的核心原则"
+      ],
+      "supporting_evidence": [/* 支撑证据数组 */],
+      "research_framework": {
+        "problem_definition": "基于内容总结的核心研究问题",
+        "theoretical_foundation": "理论基础和概念框架",
+        "methodology_insights": "从内容中提炼的方法论指导",
+        "expected_contributions": "可能的学术和实践贡献"
+      },
+      "future_directions": [/* 后续研究方向建议 */]
+    },
+    "complexity_applied": "standard",
+    "pages_analyzed": 10,
+    "processing_metadata": {
+      "workers_used": 6,
+      "depth_traversed": 3,
+      "api_calls_made": 25,
+      "processing_time_seconds": 45.2,
+      "clusters_formed": 4,
+      "top_pages_selected": 10
+    }
+  },
+  "message": "研究完成：standard级分析，10个顶级页面，4个主题簇"
+}
+```
+
+**典型用途场景**:
+- **学术研究**: 从大量资料中提取结构化研究框架
+- **项目分析**: 深度分析项目文档，生成洞察报告
+- **知识整合**: 将分散的笔记整合成系统性知识
+- **决策支持**: 为复杂决策提供全面的背景分析
+- **内容创作**: 为写作提供深度研究素材
+
+### 4.3 MCP工具优势特性
+- **智能意图理解**: 使用Gemini 2.0 Flash进行查询优化
+- **多模态内容**: 支持文本、文档、图片等多种格式
+- **关联度过滤**: 基于目的的智能内容筛选
+- **并发处理**: 多Agent并发架构，高效处理大量内容
+- **容错机制**: 完整的错误处理和降级策略
+- **Token优化**: KV Cache优化，降低API调用成本
+- **实时同步**: 内容永远从Notion实时获取，保证最新性
+- **结构化输出**: 严格的Pydantic模型，确保数据质量
 
 ### 4.3 项目进展状态 ✅
 项目已完成核心功能开发，当前状态：

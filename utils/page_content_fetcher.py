@@ -74,6 +74,7 @@ class PageContentFetcher:
             
             # 根据配置获取页面内容
             if final_config['include_files']:
+                # 自动解析文件 处理 PDF WORD EXCEL
                 content = await self.notion_client.extractor.get_page_content_with_files(normalized_id)
             else:
                 content = await self.notion_client.extractor.get_page_content(normalized_id)

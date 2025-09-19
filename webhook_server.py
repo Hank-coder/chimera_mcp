@@ -408,17 +408,18 @@ def main():
         ssl_cert_path = Path(args.ssl_cert)
         ssl_key_path = Path(args.ssl_key)
 
-        if not ssl_cert_path.exists() or not ssl_key_path.exists():
-            logger.error(f"❌ SSL certificate files not found:")
-            logger.error(f"  Cert: {ssl_cert_path} (exists: {ssl_cert_path.exists()})")
-            logger.error(f"  Key: {ssl_key_path} (exists: {ssl_key_path.exists()})")
-            sys.exit(1)
-
-        ssl_config = {
-            "ssl_keyfile": str(ssl_key_path),
-            "ssl_certfile": str(ssl_cert_path)
-        }
-        logger.info(f"✅ SERVER 模式启用 SSL: {ssl_cert_path}")
+        # 检查证书文件是否存在，存在就使用SSL，不存在就跳过
+        if ssl_cert_path.exists() and ssl_key_path.exists():
+            ssl_config = {
+                "ssl_keyfile": str(ssl_key_path),
+                "ssl_certfile": str(ssl_cert_path)
+            }
+            logger.info(f"✅ SERVER模式启用SSL: {ssl_cert_path}")
+        else:
+            logger.warning("⚠️ SSL证书文件不存在，使用HTTP模式")
+            logger.info("💡 建议配置反向代理(如Nginx)提供HTTPS支持")
+            logger.info(f"  期望的证书路径: {ssl_cert_path}")
+            logger.info(f"  期望的密钥路径: {ssl_key_path}")
     else:
         logger.info("🏠 LOCAL 模式，不启用 SSL")
 
