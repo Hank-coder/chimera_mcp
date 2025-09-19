@@ -282,9 +282,11 @@ async def notion_webhook(request: Request):
         # 基本日志记录
         logger.info(
             f"📨 Notion {event_data.get('type', 'unknown')} - {event_data.get('entity', {}).get('id', 'unknown')}")
-        if settings.device.upper() == "LOCAL":
-            logger.info(f"🔍 [DEBUG] 完整webhook数据: {json.dumps(event_data, indent=2, ensure_ascii=False)}")
-            logger.info(f"🔍 [DEBUG] 请求头: {dict(request.headers)}")
+
+        # 显示详细调试信息（帮助排查问题）
+        logger.info(f"🔍 [DEBUG] 完整webhook数据: {json.dumps(event_data, indent=2, ensure_ascii=False)}")
+        logger.info(f"🔍 [DEBUG] 请求头: {dict(request.headers)}")
+        logger.info(f"🔍 [DEBUG] 请求体大小: {len(body)} bytes")
 
         # 检查是否是挑战验证
         if event_data.get("type") == "challenge":
