@@ -335,7 +335,7 @@ class ChimeraFastMCPServer:
                 "}"
             )
         )
-        async def relationship_search(params: RelationshipSearchInput, ctx: Context) -> ChimeraResult:
+        async def search(params: RelationshipSearchInput, ctx: Context) -> ChimeraResult:
             """
             微信关系搜索工具
             params: RelationshipSearchInput 是业务输入参数，由客户端/大模型传入；
