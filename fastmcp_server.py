@@ -494,10 +494,10 @@ class ChimeraFastMCPServer:
         try:
             # 使用Streamable HTTP传输运行服务器，兼容mcp-remote
             self.mcp.run(
-                transport="http",
+                transport="sse",
                 host=host,
                 port=port,
-                stateless_http=True  # 启用无状态HTTP模式
+                # stateless_http=True  # 启用无状态HTTP模式
             )
         except Exception as e:
             logger.exception(f"Error running FastMCP server: {e}")
