@@ -1,7 +1,6 @@
 # Project Chimera
 
 🧠 **个人AI记忆系统** - 让AI成为真正懂你的"第二大脑"
-
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/uv-latest-green.svg)](https://github.com/astral-sh/uv)
 [![Neo4j](https://img.shields.io/badge/neo4j-5.x-red.svg)](https://neo4j.com/)
