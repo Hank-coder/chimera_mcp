@@ -22,7 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from agents.intent_search import search_user_intent
 from agents.deep_research import ContextEngineeringDirector
-from utils.fastmcp_utils import get_bearer_token, get_path_contents_async
+from utils.fastmcp_utils import get_bearer_token
 from config.settings import get_settings
 from core.wechat_search import search_wechat_relationships
 from core.models import DeepResearchRequest
@@ -224,55 +224,59 @@ class ChimeraFastMCPServer:
                     
                     for confidence_path in result.confidence_paths:
                         core_page = confidence_path.core_page
-                        
-                        # 如果有完整路径信息，获取所有页面内容
+
+                        # 🚀 优化：直接使用已有的页面内容，避免重复获取
+                        # CorePageResult 中已经包含了页面内容，无需重复调用 get_path_contents_async
+
+                        # 构建路径内容：使用已获取的页面内容
+                        path_contents = []
+
+                        # 如果有完整路径信息，构建路径内容数组
                         if core_page.path_ids and core_page.path_titles:
-                            path_contents = await get_path_contents_async(
-                                self.notion_client,
-                                core_page.path_titles, 
-                                core_page.path_ids,
-                                include_files=True,  # 默认提取文档
-                                max_content_length=params.max_page_content_length,
-                                max_file_content_length=params.max_file_content_length
-                            )
-                            
-                            # 获取叶子页面（最后一个页面）的时间信息
-                            leaf_time = ""
-                            if path_contents:
-                                leaf_page = path_contents[-1]  # 叶子页面是路径中的最后一个
-                                leaf_time = leaf_page.get("last_edited_time", "")
-                            
-                            path_data = {
-                                "path": core_page.path_string,
-                                "confidence": core_page.confidence_score,
-                                "last_edited_time": leaf_time,
-                                "path_contents": path_contents,
-                                "total_pages": len(path_contents)
-                            }
+                            # 为路径中的每个页面创建内容项，核心页面使用已获取的内容
+                            for i, (page_id, page_title) in enumerate(zip(core_page.path_ids, core_page.path_titles)):
+                                if page_id == core_page.notion_id:
+                                    # 这是核心页面，使用已获取的内容
+                                    page_content_item = {
+                                        "position": i,
+                                        "title": page_title,
+                                        "notion_id": page_id,
+                                        "content": core_page.content,
+                                        "content_length": len(core_page.content),
+                                        "last_edited_time": core_page.last_edited_time,
+                                        "status": "success"
+                                    }
+                                else:
+                                    # 这是路径中的其他页面，创建基本信息（不重复获取内容）
+                                    page_content_item = {
+                                        "position": i,
+                                        "title": page_title,
+                                        "notion_id": page_id,
+                                        "content": f"📄 路径页面: {page_title}",
+                                        "content_length": 0,
+                                        "last_edited_time": "",
+                                        "status": "path_only"
+                                    }
+                                path_contents.append(page_content_item)
                         else:
-                            # 备用：单页面结果，从JSON缓存获取时间
-                            import json
-                            from pathlib import Path
-                            page_time = ""
-                            try:
-                                cache_file = Path("llm_cache/chimera_cache.json")
-                                if cache_file.exists():
-                                    with open(cache_file, 'r', encoding='utf-8') as f:
-                                        cache_data = json.load(f)
-                                        pages = cache_data.get("pages", {})
-                                        page_info = pages.get(core_page.notion_id, {})
-                                        page_time = page_info.get("lastEditedTime", "")
-                            except Exception:
-                                pass
-                            
-                            path_data = {
-                                "path": core_page.title,
-                                "confidence": core_page.confidence_score,
-                                "last_edited_time": page_time,
-                                "notion_id": core_page.notion_id,
+                            # 没有完整路径信息，只有核心页面
+                            path_contents = [{
+                                "position": 0,
                                 "title": core_page.title,
-                                "content": core_page.content
-                            }
+                                "notion_id": core_page.notion_id,
+                                "content": core_page.content,
+                                "content_length": len(core_page.content),
+                                "last_edited_time": core_page.last_edited_time,
+                                "status": "success"
+                            }]
+
+                        path_data = {
+                            "path": core_page.path_string,
+                            "confidence": core_page.confidence_score,
+                            "last_edited_time": core_page.last_edited_time,
+                            "path_contents": path_contents,
+                            "total_pages": len(path_contents)
+                        }
                         
                         paths_data.append(path_data)
                     

@@ -682,7 +682,6 @@ class IntentSearchEngine:
 
             # 4. 转换为统一格式 - 只使用高质量结果
             for result in high_quality_results:
-                print(f"Embedding top结果: {result['title']} (相似度: {result['score']:.4f})")
                 embedding_results.append({
                     'leaf_id': result['notionId'],  # 新格式使用'notionId'
                     'leaf_title': result['title'],
