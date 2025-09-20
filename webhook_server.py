@@ -122,10 +122,10 @@ async def queue_worker():
                 processing_time = (datetime.now() - start_time).total_seconds()
 
                 if result.get("success", False):
-                    # 检查是否包含embedding更新信息
+                    # 检查是否实际触发了embedding更新
                     embedding_status = ""
                     if event_type in ['page.created', 'page.properties_updated', 'page.content_updated']:
-                        embedding_status = " [🧠 可能触发embedding更新]"
+                        embedding_status = " [🧠 智能embedding判断]"
 
                     logger.info(f"✅ [队列] 事件处理成功 {processing_time:.2f}s{embedding_status}: {result}")
                 else:

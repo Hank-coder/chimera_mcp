@@ -127,10 +127,12 @@ class NotionWebhookHandler:
             if result.get("success", False):
                 await self._update_json_cache()
 
-                # 🆕 检查是否需要更新embedding
+                # 🆕 智能检查是否需要更新embedding
                 page_id = event_data.get('entity', {}).get('id')
-                if page_id and event_type in ['page.created', 'page.properties_updated', 'page.content_updated']:
-                    await self._handle_embedding_update(page_id, event_type)
+                if page_id:
+                    should_update = await self._should_update_embedding(page_id, event_type, event_data)
+                    if should_update:
+                        await self._handle_embedding_update(page_id, event_type)
 
             return result
             
@@ -732,6 +734,79 @@ class NotionWebhookHandler:
             json.dump(cache_data, f, ensure_ascii=False, indent=2, default=json_encoder)
         
         temp_file.replace(cache_file)
+
+    async def _should_update_embedding(self, page_id: str, event_type: str, event_data: dict) -> bool:
+        """
+        智能判断是否需要更新embedding
+        只有在页面标题或一二级标题变化时才更新embedding
+
+        触发条件：
+        1. page.created - 新建页面
+        2. page.properties_updated - 页面属性更新（通常是标题）
+        3. page.content_updated - 仅当涉及标题内容的变化
+        """
+        try:
+            # 1. 新建页面总是需要生成embedding
+            if event_type == 'page.created':
+                logger.debug(f"页面 {page_id} 新建，需要生成embedding")
+                return True
+
+            # 2. 页面属性更新（通常是标题变化）
+            if event_type == 'page.properties_updated':
+                logger.debug(f"页面 {page_id} 属性更新，可能是标题变化，需要更新embedding")
+                return True
+
+            # 3. 页面内容更新 - 需要进一步判断是否涉及标题
+            if event_type == 'page.content_updated':
+                # 获取当前页面的结构化标题
+                from core.embedding_service import extract_structured_headings
+
+                try:
+                    current_structured = await extract_structured_headings(page_id)
+                    if not current_structured:
+                        logger.debug(f"页面 {page_id} 无法提取结构化标题，跳过embedding更新")
+                        return False
+
+                    # 获取数据库中已存储的embedding文本
+                    async with self.graph_client._driver.session() as session:
+                        result = await session.run("""
+                            MATCH (p:NotionPage {notionId: $page_id})
+                            RETURN p.geminiEmbeddingText as stored_text
+                        """, {"page_id": page_id})
+
+                        record = await result.single()
+                        if not record or not record.get('stored_text'):
+                            logger.debug(f"页面 {page_id} 没有已存储的embedding文本，需要生成")
+                            return True
+
+                        stored_text = record['stored_text']
+
+                    # 生成当前的embedding文本
+                    from core.embedding_service import format_structured_text_for_embedding
+                    current_text = format_structured_text_for_embedding(current_structured)
+
+                    # 比较标题内容是否发生变化
+                    if current_text != stored_text:
+                        logger.info(f"页面 {page_id} 标题内容发生变化，需要更新embedding")
+                        logger.debug(f"旧文本: {stored_text}")
+                        logger.debug(f"新文本: {current_text}")
+                        return True
+                    else:
+                        logger.debug(f"页面 {page_id} 标题内容未变化，无需更新embedding")
+                        return False
+
+                except Exception as e:
+                    logger.warning(f"页面 {page_id} 标题变化检测失败: {e}，默认更新embedding")
+                    return True
+
+            # 4. 其他事件类型不触发embedding更新
+            logger.debug(f"页面 {page_id} 事件类型 {event_type} 不触发embedding更新")
+            return False
+
+        except Exception as e:
+            logger.error(f"判断页面 {page_id} 是否需要更新embedding时出错: {e}")
+            # 出错时默认更新，确保不遗漏
+            return True
 
     async def _handle_embedding_update(self, page_id: str, event_type: str):
         """
