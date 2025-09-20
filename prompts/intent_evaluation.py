@@ -48,8 +48,8 @@ class IntentEvaluationPrompt:
             ---
             **输出要求**
             -   请严格按照以下JSON格式返回。
-            -   **只** 包含最终 `confidence_score` **大于等于 0.65** 的路径。
-            -   `reasoning` 必须简洁地解释评估结果，**必须明确提及时间评估的结果**（例如，“时间匹配成功”或“查询无时间要求”）。
+            -   **只** 包含最终 `confidence_score` **大于等于 0.8** 的路径
+            -   `reasoning` 必须简洁地解释评估结果，**必须明确提及时间评估的结果**（例如，"时间匹配成功"或"查询无时间要求"）。
             -   `document_index` 必须对应原始路径列表的准确索引（从0开始）。
             -   `summary`中的`total_candidates`请填写候选路径的总数。
             -   不要添加markdown或其他任何多余的格式。
@@ -71,7 +71,7 @@ class IntentEvaluationPrompt:
                 "summary": {{
                     "total_candidates": {total_count},
                     "high_confidence_count": 2,
-                    "threshold_used": 0.65
+                    "threshold_used": 0.8
                 }}
             }}
             ```

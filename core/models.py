@@ -187,9 +187,8 @@ class ConfidenceEvaluationResponse(BaseModel):
 class IntentSearchRequest(BaseModel):
     """意图搜索请求模型"""
     intent_keywords: List[str] = Field(..., description="意图关键词列表")
-    confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="置信度阈值")
-    max_results: int = Field(default=5, ge=1, le=5, description="最大结果数量")
-    expansion_depth: int = Field(default=2, ge=1, le=3, description="路径扩展深度")
+    max_results: int = Field(default=5, ge=1, le=10, description="最大结果数量")
+    speed: bool = Field(default=False, description="速度模式：True=只使用embedding搜索，False=混合搜索")
 
 
 class IntentSearchMetadata(BaseModel):

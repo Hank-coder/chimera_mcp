@@ -41,15 +41,6 @@ class IntentSearchInput(BaseModel):
         )
     )
 
-    confidence_threshold: float = Field(
-        0.8,
-        description=(
-            "最低置信度分数（0.5-1.0），用于过滤低置信度结果。"
-            "默认值为 0.8，表示仅返回高度相关的路径。"
-            "如需扩大召回范围，可设置为更低值（如 0.65）。"
-        )
-    )
-
     search_results: int = Field(
         3,
         description=(
@@ -58,10 +49,12 @@ class IntentSearchInput(BaseModel):
         )
     )
 
-    expansion_depth: int = Field(
-        1,
+    speed: bool = Field(
+        True,
         description=(
-            "路径扩展深度。用于向外关联更多上下游页面，默认值为 1，表示仅获取直接相关页面。"
+            "速度模式开关。"
+            "True: 仅使用embedding搜索，速度快但准确性较低。"
+            "False: 使用混合搜索（LLM+embedding），准确性高但速度较慢。"
         )
     )
 
@@ -181,21 +174,21 @@ class ChimeraFastMCPServer:
         @self.mcp.tool(
             title="文档标准搜索（Notion）",
             description=(
-                    "这是我（陈宇函）的个人知识库“Chimera”**简单/标准搜索**工具，侧重于单文档。"
+                    "这是我（陈宇函）的个人知识库Chimera**简单/标准搜索**工具，侧重于单文档。"
                     "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
+                    "🔍 **搜索模式**：\n"
+                    " - 标准模式 (speed=false)：使用LLM判断+embedding搜索的混合策略，准确性高\n"
+                    " - 速度模式 (speed=true)：仅使用embedding语义搜索，速度快\n\n"
                     "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
                     " - query (字符串，必填)：搜索关键词或短语（如有时间信息请包含），示例：\"上周碳中和计划\"\n"
-                    " - confidence_threshold (浮点数，默认0.8)：最低置信度阈值，范围0.5-1.0，用于过滤搜索结果。\n"
-                    " - search_results (整数，默认3)：返回的最大搜索结果条数。\n"
-                    " - expansion_depth (整数，默认1)：路径扩展深度，决定关联更多上下游页面的层级。\n"
-                    " - max_file_content_length (整数，默认8000)：单个文档文件内容最大字符数限制。\n"
-                    " - max_page_content_length (整数，默认10000)：单个Notion页面内容最大字符数限制。\n\n"
-                    "请确保参数名称和类型正确，避免使用其他相似但不一致的名称。\n"
+                    " - search_results (整数，默认5)：返回的最大搜索结果条数\n"
+                    " - speed (布尔值，默认true)：速度模式开关，true=仅embedding搜索（快），false=混合搜索（准确）\n"
+                    "⚡ **性能建议**：高准确性时使用标准模式；快速查找使用速度模式。\n\n"
                     "示例参数JSON格式：\n"
                     "{\n"
-                    "  \"query\": \"碳中和\",\n"
-                    "  \"confidence_threshold\": 0.8,\n"
-                    "  \"search_results\": 3,\n"
+                    "  \"query\": \"碳中和项目进展\",\n"
+                    "  \"search_results\": 5,\n"
+                    "  \"speed\": true\n"
                     "}"
             )
         )
@@ -219,9 +212,8 @@ class ChimeraFastMCPServer:
                 
                 result = await search_user_intent(
                     user_input=params.query,
-                    confidence_threshold=params.confidence_threshold,
-                    search_results=params.search_results,
-                    expansion_depth=params.expansion_depth
+                    max_results=params.search_results,
+                    speed=params.speed
                 )
                 
                 logger.debug(f"Intent search completed, success: {result.success}")

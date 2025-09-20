@@ -67,39 +67,49 @@ class IntentSearchEngine:
             # 2. 构建搜索请求
             search_request = IntentSearchRequest(
                 intent_keywords=intent_keywords,
-                confidence_threshold=kwargs.get('confidence_threshold', 0.7),
                 max_results=kwargs.get('max_results', 5),
-                expansion_depth=kwargs.get('expansion_depth', 2)
+                speed=kwargs.get('speed', True)
             )
 
-            # 3. 🆕 并行执行：获取候选路径 + embedding搜索
-            candidate_paths_task = self._get_complete_paths()
-            embedding_search_task = self._google_embedding_search(search_request.intent_keywords)
+            # 3. 🆕 根据speed参数选择执行模式
+            if search_request.speed:
+                # 速度模式：只使用embedding搜索
+                embedding_results = await self._google_embedding_search(search_request.intent_keywords)
+                confidence_paths = await self._build_speed_mode_paths(embedding_results, search_request)
+            else:
+                # 标准模式：并行执行LLM判断 + embedding搜索
+                candidate_paths_task = self._get_complete_paths()
+                embedding_search_task = self._google_embedding_search(search_request.intent_keywords)
 
-            candidate_paths, embedding_results = await asyncio.gather(
-                candidate_paths_task,
-                embedding_search_task
-            )
+                candidate_paths, embedding_results = await asyncio.gather(
+                    candidate_paths_task,
+                    embedding_search_task
+                )
 
-            # 保存embedding结果供后续使用
-            self._embedding_results = embedding_results
+                # 保存embedding结果供后续使用
+                self._embedding_results = embedding_results
 
-            # 4. 使用Gemini进行路径置信度评估
-            confidence_evaluation = await self._evaluate_path_confidence(
-                user_input, candidate_paths
-            )
+                # 4. 使用Gemini进行路径置信度评估
+                confidence_evaluation = await self._evaluate_path_confidence(
+                    user_input, candidate_paths
+                )
 
-            # 5. 选择高置信度路径并扩展
-            confidence_paths = await self._build_confidence_paths(
-                confidence_evaluation, search_request, candidate_paths
-            )
+                # 5. 选择高置信度路径并扩展
+                confidence_paths = await self._build_confidence_paths(
+                    confidence_evaluation, search_request, candidate_paths
+                )
             
             # 6. 构建响应元数据
             processing_time = (time.time() - start_time) * 1000
+            if search_request.speed:
+                initial_candidates = 0
+            else:
+                initial_candidates = len(candidate_paths) if 'candidate_paths' in locals() else 0
+
             metadata = IntentSearchMetadata(
-                initial_candidates=len(candidate_paths),
+                initial_candidates=initial_candidates,
                 high_confidence_matches=len(confidence_paths),
-                confidence_threshold=search_request.confidence_threshold,
+                confidence_threshold=0.8,  # 固定值
                 processing_time_ms=processing_time
             )
             
@@ -233,7 +243,7 @@ class IntentSearchEngine:
                 summary={
                     'total_candidates': 0,
                     'high_confidence_count': 0,
-                    'threshold_used': 0.7
+                    'threshold_used': 0.8
                 }
             )
         
@@ -313,10 +323,10 @@ class IntentSearchEngine:
         
         confidence_paths = []
         
-        # 筛选高置信度评估
+        # 筛选高置信度评估 (固定阈值0.8)
         high_confidence_evals = [
             eval_item for eval_item in evaluation.evaluations
-            if self._get_confidence_score(eval_item) >= request.confidence_threshold
+            if self._get_confidence_score(eval_item) >= 0.8
         ]
         
         # 按置信度排序，不限制数量（让client的search_results控制）
@@ -332,16 +342,16 @@ class IntentSearchEngine:
                     eval_item, request, candidate_paths
                 )
                 
-                # 获取相关页面
+                # 获取相关页面 (固定深度2)
                 related_pages = await self._expand_related_pages(
-                    core_page.notion_id, request.expansion_depth
+                    core_page.notion_id, 2
                 )
                 
                 # 构建路径元数据
                 path_metadata = ConfidencePathMetadata(
                     total_pages=1 + len(related_pages),
                     confidence_level=self._get_confidence_level(self._get_confidence_score(eval_item)),
-                    expansion_depth=request.expansion_depth
+                    expansion_depth=2  # 固定深度
                 )
                 
                 confidence_path = ConfidencePath(
@@ -695,6 +705,42 @@ class IntentSearchEngine:
 
         return embedding_results
 
+    async def _build_speed_mode_paths(self, embedding_results: List[Dict[str, Any]], request: IntentSearchRequest) -> List[ConfidencePath]:
+        """
+        速度模式：只使用embedding搜索结果构建路径
+
+        Args:
+            embedding_results: embedding搜索结果
+            request: 搜索请求
+
+        Returns:
+            构建的置信度路径列表
+        """
+        print(f"⚡ 速度模式：只使用embedding搜索，找到 {len(embedding_results)} 个结果")
+
+        confidence_paths = []
+
+        try:
+            # 对embedding结果按相似度排序
+            sorted_results = sorted(embedding_results, key=lambda x: x['semantic_score'], reverse=True)
+
+            # 应用max_results限制
+            limited_results = sorted_results[:request.max_results]
+
+            for embedding_result in limited_results:
+                embedding_path = await self._create_embedding_confidence_path(embedding_result, request)
+                if embedding_path:
+                    # 标记为速度模式结果
+                    embedding_path.core_page.search_source = 'speed_mode_embedding'
+                    confidence_paths.append(embedding_path)
+                    print(f"⚡ 速度模式结果: {embedding_path.core_page.title} (相似度: {embedding_path.core_page.confidence_score:.4f})")
+
+            print(f"⚡ 速度模式完成，返回 {len(confidence_paths)} 个结果")
+            return confidence_paths
+
+        except Exception as e:
+            print(f"速度模式构建路径失败: {e}")
+            return []
 
 
 # 便利函数
@@ -719,9 +765,8 @@ if __name__ == "__main__":
         # 测试意图搜索
         result = await search_user_intent(
             "我想找关于机器学习项目的笔记",
-            confidence_threshold=0.6,
             max_results=3,
-            expansion_depth=2
+            speed=False
         )
         
         print(f"搜索成功: {result.success}")
