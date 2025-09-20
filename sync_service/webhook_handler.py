@@ -781,11 +781,11 @@ class NotionWebhookHandler:
             async with self.graph_client._driver.session() as session:
                 query = """
                 MATCH (p:NotionPage {notionId: $page_id})
-                RETURN p.titleEmbedding IS NULL as needs_embedding,
-                       p.embeddingUpdatedAt as last_embedding_updated,
+                RETURN p.geminiEmbedding IS NULL as needs_embedding,
+                       p.geminiEmbeddingUpdatedAt as last_embedding_updated,
                        p.lastEditedTime as last_edited,
                        p.title as current_title,
-                       p.embeddingText as current_embedding_text
+                       p.geminiEmbeddingText as current_embedding_text
                 """
 
                 result = await session.run(query, page_id=page_id)
@@ -828,10 +828,9 @@ class NotionWebhookHandler:
             async with self.graph_client._driver.session() as session:
                 query = """
                 MATCH (p:NotionPage {notionId: $page_id})
-                SET p.titleEmbedding = $embedding_vector,
-                    p.embeddingText = $embedding_text,
-                    p.embeddingUpdatedAt = datetime(),
-                    p.updatedAt = datetime()
+                SET p.geminiEmbedding = $embedding_vector,
+                    p.geminiEmbeddingText = $embedding_text,
+                    p.geminiEmbeddingUpdatedAt = datetime()
                 RETURN p.title as title
                 """
 

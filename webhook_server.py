@@ -122,7 +122,12 @@ async def queue_worker():
                 processing_time = (datetime.now() - start_time).total_seconds()
 
                 if result.get("success", False):
-                    logger.info(f"✅ [队列] 事件处理成功 {processing_time:.2f}s: {result}")
+                    # 检查是否包含embedding更新信息
+                    embedding_status = ""
+                    if event_type in ['page.created', 'page.properties_updated', 'page.content_updated']:
+                        embedding_status = " [🧠 可能触发embedding更新]"
+
+                    logger.info(f"✅ [队列] 事件处理成功 {processing_time:.2f}s{embedding_status}: {result}")
                 else:
                     logger.error(f"❌ [队列] 事件处理失败 {processing_time:.2f}s: {result}")
             else:
@@ -297,7 +302,13 @@ async def notion_webhook(request: Request):
         # 记录接收到的事件
         event_type = event_data.get("type", "unknown")
         entity_id = event_data.get("entity", {}).get("id", "unknown")
-        logger.debug(f"📄 处理webhook事件: {event_type} for entity {entity_id}")
+
+        # 特别标记可能触发embedding更新的事件
+        embedding_trigger = ""
+        if event_type in ['page.created', 'page.properties_updated', 'page.content_updated']:
+            embedding_trigger = " [🧠 Embedding候选]"
+
+        logger.debug(f"📄 处理webhook事件: {event_type} for entity {entity_id}{embedding_trigger}")
 
         # 将事件加入队列进行顺序处理
         await event_queue.put(event_data)
