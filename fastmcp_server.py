@@ -95,7 +95,7 @@ class RelationshipSearchInput(BaseModel):
     )
     
     max_results: int = Field(
-        3,
+        5,
         description=(
             "返回的最大搜索结果数量，默认返回5个相关结果。"
             "可根据需要调整数量上限。"

@@ -11,7 +11,7 @@ import json
 
 from core.models import (
     IntentSearchRequest,
-    IntentSearchResponse, 
+    IntentSearchResponse,
     IntentSearchMetadata,
     ConfidencePath,
     CorePageResult,
@@ -23,6 +23,8 @@ from core.models import (
 )
 from core.graphiti_client import GraphitiClient
 from core.notion_client import NotionClient
+from core.embedding_service import GoogleEmbeddingService
+from core.embedding_search import EmbeddingSearchService
 from prompts.intent_evaluation import IntentEvaluationPrompt
 from utils.page_content_fetcher import get_page_content_for_intent_search
 import google.generativeai as genai
@@ -37,6 +39,10 @@ class IntentSearchEngine:
         self.notion_client = NotionClient()
         self.intent_prompt = IntentEvaluationPrompt()
 
+        # 🆕 初始化embedding服务
+        self.embedding_service = GoogleEmbeddingService()
+        self.embedding_search_service = EmbeddingSearchService()
+
         # 配置Gemini
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
@@ -44,36 +50,45 @@ class IntentSearchEngine:
     async def search_by_intent(self, user_input: str, **kwargs) -> IntentSearchResponse:
         """
         根据用户意图进行搜索的主函数
-        
+
         Args:
             user_input: 用户输入的查询文本
             **kwargs: 可选参数，用于覆盖默认设置
-        
+
         Returns:
             IntentSearchResponse: 完整的搜索结果
         """
         start_time = time.time()
-        
+
         try:
             # 1. 意图关键词提取
             intent_keywords = await self._extract_intent_keywords(user_input)
-            
+
             # 2. 构建搜索请求
             search_request = IntentSearchRequest(
                 intent_keywords=intent_keywords,
                 confidence_threshold=kwargs.get('confidence_threshold', 0.7),
-                max_results=kwargs.get('max_results', 2),
+                max_results=kwargs.get('max_results', 5),
                 expansion_depth=kwargs.get('expansion_depth', 2)
             )
-            
-            # 3. 枚举Neo4j中的候选路径
-            candidate_paths = await self._enumerate_graph_paths(search_request)
-            
+
+            # 3. 🆕 并行执行：获取候选路径 + embedding搜索
+            candidate_paths_task = self._get_complete_paths()
+            embedding_search_task = self._google_embedding_search(search_request.intent_keywords)
+
+            candidate_paths, embedding_results = await asyncio.gather(
+                candidate_paths_task,
+                embedding_search_task
+            )
+
+            # 保存embedding结果供后续使用
+            self._embedding_results = embedding_results
+
             # 4. 使用Gemini进行路径置信度评估
             confidence_evaluation = await self._evaluate_path_confidence(
                 user_input, candidate_paths
             )
-            
+
             # 5. 选择高置信度路径并扩展
             confidence_paths = await self._build_confidence_paths(
                 confidence_evaluation, search_request, candidate_paths
@@ -125,19 +140,6 @@ class IntentSearchEngine:
         
         return keywords[:5]  # 最多5个关键词
     
-    async def _enumerate_graph_paths(self, request: IntentSearchRequest) -> List[Dict[str, Any]]:
-        """枚举Neo4j图谱中从根到叶子的完整路径"""
-        
-        try:
-            # 获取所有完整路径（从根节点到叶子节点）
-            complete_paths = await self._get_complete_paths()
-            
-            print(f"枚举到 {len(complete_paths)} 条完整路径")
-            return complete_paths
-            
-        except Exception as e:
-            print(f"枚举图谱路径时出错: {e}")
-            return []
     
     async def _get_complete_paths(self) -> List[Dict[str, Any]]:
         """从JSON缓存获取所有完整路径"""
@@ -317,12 +319,11 @@ class IntentSearchEngine:
             if self._get_confidence_score(eval_item) >= request.confidence_threshold
         ]
         
-        # 按置信度排序，取前max_results个
+        # 按置信度排序，不限制数量（让client的search_results控制）
         high_confidence_evals.sort(
-            key=lambda x: self._get_confidence_score(x), 
+            key=lambda x: self._get_confidence_score(x),
             reverse=True
         )
-        high_confidence_evals = high_confidence_evals[:request.max_results]
         
         for eval_item in high_confidence_evals:
             try:
@@ -354,9 +355,111 @@ class IntentSearchEngine:
             except Exception as e:
                 print(f"构建置信度路径时出错: {e}")
                 continue
-        
-        return confidence_paths
-    
+
+        # 🆕 智能混合搜索：合并embedding结果
+        final_paths = await self._smart_merge_with_embedding_results(confidence_paths, request)
+
+        return final_paths
+
+    async def _smart_merge_with_embedding_results(self, llm_paths: List[ConfidencePath], request: IntentSearchRequest) -> List[ConfidencePath]:
+        """混合搜素：LLM结果 + Embedding top3，去重后返回"""
+
+        if not hasattr(self, '_embedding_results') or not self._embedding_results:
+            print("无embedding搜索结果，返回LLM判断结果")
+            return llm_paths
+
+        try:
+
+            # 1. 先添加所有LLM结果
+            final_results = []
+            llm_page_ids = set()
+
+            for path in llm_paths:
+                print(f"LLM判断结果: {path.core_page.title} (置信度: {path.core_page.confidence_score:.4f})")
+                final_results.append(path)
+                llm_page_ids.add(path.core_page.notion_id)
+                path.core_page.search_source = 'llm_judgment'
+
+            # 2. 添加embedding结果（去重）
+            embedding_added = 0
+            for embedding_result in self._embedding_results:
+                page_id = embedding_result['leaf_id']
+                if page_id not in llm_page_ids:  # 去重
+                    embedding_path = await self._create_embedding_confidence_path(embedding_result, request)
+                    if embedding_path:
+                        final_results.append(embedding_path)
+                        embedding_added += 1
+
+            # 3. 应用max_results限制
+            if len(final_results) > request.max_results:
+                # 按置信度排序，取top N
+                final_results.sort(key=lambda x: x.core_page.confidence_score, reverse=True)
+                final_results = final_results[:request.max_results]
+            # print(final_results)
+            return final_results
+
+        except Exception as e:
+            print(f"合并出错: {e}，返回LLM结果")
+            return llm_paths
+
+
+    async def _create_embedding_confidence_path(self, embedding_result: Dict[str, Any], request: IntentSearchRequest) -> ConfidencePath:
+        """将embedding搜索结果转换为ConfidencePath"""
+
+        try:
+            page_id = embedding_result['leaf_id']  # 修正：使用leaf_id
+            page_title = embedding_result['leaf_title']  # 修正：使用leaf_title
+            page_url = embedding_result.get('leaf_url', '')  # 修正：使用leaf_url
+            semantic_score = embedding_result['semantic_score']
+
+            # 获取页面内容
+            from utils.page_content_fetcher import get_page_content_for_intent_search
+            page_content, latest_timestamp, metadata = await get_page_content_for_intent_search(
+                page_id=page_id,
+                is_core_page=True,
+                max_length=8000
+            )
+
+            # 使用embedding搜索中返回的完整路径信息
+            path_string = embedding_result.get('path_string', page_title)
+            path_titles = embedding_result.get('path_titles', [page_title])
+            path_ids = embedding_result.get('path_ids', [page_id])
+
+            # 创建CorePageResult
+            core_page = CorePageResult(
+                notion_id=page_id,
+                title=page_title,
+                url=page_url,
+                tags=[],
+                content=page_content,
+                confidence_score=semantic_score,  # 使用语义相似度作为置信度
+                path_string=path_string,  # 使用完整路径信息
+                path_titles=path_titles,
+                path_ids=path_ids,
+                last_edited_time=latest_timestamp
+            )
+
+            # 标记来源和语义得分
+            core_page.search_source = 'embedding'
+            core_page.semantic_score = semantic_score
+
+            # 创建路径元数据
+            path_metadata = ConfidencePathMetadata(
+                total_pages=1,
+                confidence_level='high' if semantic_score >= 0.8 else 'medium',
+                expansion_depth=0  # embedding结果不做扩展
+            )
+
+            return ConfidencePath(
+                core_page=core_page,
+                related_pages=[],  # embedding结果不扩展相关页面，保持简洁
+                path_metadata=path_metadata
+            )
+
+        except Exception as e:
+            print(f"转换embedding结果失败: {e}")
+            return None
+
     async def _build_core_page_result(
         self, 
         eval_item, 
@@ -538,6 +641,60 @@ class IntentSearchEngine:
             return "中等"
         else:
             return "低"
+
+
+    async def _google_embedding_search(self, keywords: List[str]) -> List[Dict[str, Any]]:
+        """使用Google embedding进行语义搜索"""
+
+        embedding_results = []
+
+        try:
+            # 1. 为搜索关键词生成embedding
+            search_text = ' '.join(keywords)
+            search_embedding = await self.embedding_service.get_embedding(search_text)
+
+            if not search_embedding:
+                print("生成搜索embedding失败，跳过embedding搜索")
+                return []
+
+            # 2. 使用新的embedding搜索服务
+            await self.embedding_search_service.initialize()
+            search_results = await self.embedding_search_service.search_similar_pages(
+                query_text=search_text,
+                limit=20,  # 多搜索一些候选
+                similarity_threshold=0.5  # 低阈值搜索更多候选
+            )
+            # 3. 筛选高质量结果：只保留相似度 > 0.75 的top3
+            high_quality_results = [
+                result for result in search_results
+                if result['score'] > 0.8
+            ][:3]  # 取top3
+
+            # 4. 转换为统一格式 - 只使用高质量结果
+            for result in high_quality_results:
+                print(f"Embedding top结果: {result['title']} (相似度: {result['score']:.4f})")
+                embedding_results.append({
+                    'leaf_id': result['notionId'],  # 新格式使用'notionId'
+                    'leaf_title': result['title'],
+                    'path_string': result['title'],  # 暂时使用title作为path_string
+                    'path_titles': [result['title']],  # 暂时使用title作为path_titles
+                    'path_ids': [result['notionId']],  # 暂时使用notionId作为path_ids
+                    'leaf_last_edited_time': '',  # 从embedding搜索中暂时没有这个信息
+                    'leaf_tags': [],  # 从embedding搜索中暂时没有这个信息
+                    'leaf_url': result.get('url', ''),
+                    'path_length': 0,  # 暂时设为0，因为是单个页面
+                    'path_type': 'embedding_search',
+                    'semantic_score': result['score'],  # 新格式使用'score'字段
+                    'embedding_text': '',  # 新格式暂时没有这个信息
+                    'search_source': 'google_embedding'
+                })
+
+
+        except Exception as e:
+            print(f"Google embedding搜索时出错: {e}")
+
+        return embedding_results
+
 
 
 # 便利函数

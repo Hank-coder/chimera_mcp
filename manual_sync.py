@@ -243,12 +243,12 @@ async def run_force_full_sync():
 async def show_stats():
     """显示Neo4j数据库统计信息"""
     logger.info("📊 检查Neo4j数据库统计...")
-    
+
     try:
         from core.graphiti_client import GraphitiClient
         graph_client = GraphitiClient()
         await graph_client.initialize()
-        
+
         stats_query = """
         CALL {
             MATCH (p:NotionPage) RETURN count(p) as pages
@@ -261,24 +261,25 @@ async def show_stats():
         }
         RETURN pages, child_relations, tag_relations
         """
-        
+
         async with graph_client._driver.session() as session:
             result = await session.run(stats_query)
             record = await result.single()
-            
+
             if record:
                 logger.info(f"📄 总页面数: {record['pages']}")
                 logger.info(f"🔗 父子关系数: {record['child_relations']}")
                 logger.info(f"🏷️  标签关系数: {record['tag_relations']}")
             else:
                 logger.info("📊 未找到统计数据")
-        
+
         await graph_client.close()
         return True
-        
+
     except Exception as e:
         logger.error(f"无法获取统计信息: {e}")
         return False
+
 
 
 def main():
@@ -321,13 +322,26 @@ def main():
     )
     
     parser.add_argument(
-        "--stats", 
+        "--stats",
         action="store_true",
-        help="显示Neo4j数据库统计信息"
+        help="显示Neo4j数据库统计信息（包含embedding覆盖率）"
     )
-    
+
+    # 🆕 Embedding相关命令
     parser.add_argument(
-        "--debug", 
+        "--generate-embeddings",
+        action="store_true",
+        help="为没有embedding的页面批量生成embedding"
+    )
+
+    parser.add_argument(
+        "--test-embedding-search",
+        action="store_true",
+        help="测试embedding搜索功能"
+    )
+
+    parser.add_argument(
+        "--debug",
         action="store_true",
         help="启用调试模式"
     )

@@ -14,6 +14,7 @@ from loguru import logger
 from core.graphiti_client import GraphitiClient
 from core.notion_client import NotionExtractor
 from core.models import NotionPageMetadata, NodeType, extract_title_from_page, extract_tags_from_page, extract_parent_id_from_page
+from core.embedding_service import generate_page_embedding, extract_structured_headings
 from config.settings import get_settings
 
 
@@ -122,10 +123,15 @@ class NotionWebhookHandler:
                 logger.warning(f"Unsupported event type: {event_type}")
                 result = {"success": False, "error": f"Unsupported event type: {event_type}"}
             
-            # 如果处理成功，更新JSON缓存
+            # 如果处理成功，更新JSON缓存和embedding
             if result.get("success", False):
                 await self._update_json_cache()
-            
+
+                # 🆕 检查是否需要更新embedding
+                page_id = event_data.get('entity', {}).get('id')
+                if page_id and event_type in ['page.created', 'page.properties_updated', 'page.content_updated']:
+                    await self._handle_embedding_update(page_id, event_type)
+
             return result
             
         except Exception as e:
@@ -726,6 +732,128 @@ class NotionWebhookHandler:
             json.dump(cache_data, f, ensure_ascii=False, indent=2, default=json_encoder)
         
         temp_file.replace(cache_file)
+
+    async def _handle_embedding_update(self, page_id: str, event_type: str):
+        """
+        处理embedding更新逻辑
+        检查页面是否需要更新embedding，如果需要则生成新的embedding
+        """
+        try:
+            logger.info(f"🧠 检查页面 {page_id} 是否需要更新embedding (事件类型: {event_type})")
+
+            # 1. 检查是否需要更新embedding
+            needs_update = await self._check_if_embedding_needed(page_id)
+
+            if not needs_update:
+                logger.debug(f"页面 {page_id} 不需要更新embedding")
+                return
+
+            logger.info(f"🧠 页面 {page_id} 需要更新embedding，开始生成...")
+
+            # 2. 生成新的embedding
+            embedding_vector, embedding_text = await generate_page_embedding(page_id)
+
+            if embedding_vector and embedding_text:
+                # 3. 更新到Neo4j
+                success = await self._update_page_embedding_in_neo4j(
+                    page_id, embedding_vector, embedding_text
+                )
+
+                if success:
+                    logger.info(f"✅ 页面 {page_id} embedding更新成功 (维度: {len(embedding_vector)})")
+                else:
+                    logger.error(f"❌ 页面 {page_id} embedding更新到Neo4j失败")
+            else:
+                logger.warning(f"⚠️ 页面 {page_id} embedding生成失败")
+
+        except Exception as e:
+            logger.error(f"❌ 处理页面 {page_id} embedding更新时出错: {e}")
+
+    async def _check_if_embedding_needed(self, page_id: str) -> bool:
+        """
+        检查页面是否需要更新embedding
+        判断条件：
+        1. embedding为空
+        2. 页面编辑时间晚于embedding更新时间
+        3. 标题或一二级标题发生变化
+        """
+        try:
+            async with self.graph_client._driver.session() as session:
+                query = """
+                MATCH (p:NotionPage {notionId: $page_id})
+                RETURN p.titleEmbedding IS NULL as needs_embedding,
+                       p.embeddingUpdatedAt as last_embedding_updated,
+                       p.lastEditedTime as last_edited,
+                       p.title as current_title,
+                       p.embeddingText as current_embedding_text
+                """
+
+                result = await session.run(query, page_id=page_id)
+                record = await result.single()
+
+                if not record:
+                    logger.debug(f"页面 {page_id} 在图谱中不存在，需要embedding")
+                    return True
+
+                # 如果embedding为空，需要更新
+                if record['needs_embedding']:
+                    logger.debug(f"页面 {page_id} embedding为空，需要更新")
+                    return True
+
+                # 如果页面编辑时间晚于embedding更新时间，需要更新
+                last_edited = record['last_edited']
+                last_embedding_updated = record['last_embedding_updated']
+
+                if last_edited and last_embedding_updated and last_edited > last_embedding_updated:
+                    logger.debug(f"页面 {page_id} 编辑时间({last_edited})晚于embedding更新时间({last_embedding_updated})，需要更新")
+                    return True
+
+                # 如果没有embedding更新时间记录，但有embedding，说明是旧数据，需要更新
+                if not last_embedding_updated and not record['needs_embedding']:
+                    logger.debug(f"页面 {page_id} 缺少embedding更新时间记录，需要更新")
+                    return True
+
+                logger.debug(f"页面 {page_id} embedding是最新的，无需更新")
+                return False
+
+        except Exception as e:
+            logger.error(f"检查页面 {page_id} embedding需求时出错: {e}")
+            return True  # 出错时默认需要更新
+
+    async def _update_page_embedding_in_neo4j(self, page_id: str, embedding_vector: List[float], embedding_text: str) -> bool:
+        """
+        更新页面的embedding到Neo4j
+        """
+        try:
+            async with self.graph_client._driver.session() as session:
+                query = """
+                MATCH (p:NotionPage {notionId: $page_id})
+                SET p.titleEmbedding = $embedding_vector,
+                    p.embeddingText = $embedding_text,
+                    p.embeddingUpdatedAt = datetime(),
+                    p.updatedAt = datetime()
+                RETURN p.title as title
+                """
+
+                result = await session.run(
+                    query,
+                    page_id=page_id,
+                    embedding_vector=embedding_vector,
+                    embedding_text=embedding_text
+                )
+
+                record = await result.single()
+                if record:
+                    title = record['title']
+                    logger.debug(f"成功更新页面 '{title}' ({page_id}) 的embedding到Neo4j")
+                    return True
+                else:
+                    logger.error(f"页面 {page_id} 在Neo4j中不存在，无法更新embedding")
+                    return False
+
+        except Exception as e:
+            logger.error(f"更新页面 {page_id} embedding到Neo4j时出错: {e}")
+            return False
 
 
 # 工厂函数

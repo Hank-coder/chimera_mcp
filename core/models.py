@@ -188,7 +188,7 @@ class IntentSearchRequest(BaseModel):
     """意图搜索请求模型"""
     intent_keywords: List[str] = Field(..., description="意图关键词列表")
     confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="置信度阈值")
-    max_results: int = Field(default=2, ge=1, le=5, description="最大结果数量")
+    max_results: int = Field(default=5, ge=1, le=5, description="最大结果数量")
     expansion_depth: int = Field(default=2, ge=1, le=3, description="路径扩展深度")
 
 
@@ -214,6 +214,9 @@ class CorePageResult(BaseModel):
     path_ids: List[str] = Field(default_factory=list, description="路径中所有页面的ID")
     # 添加时间信息
     last_edited_time: Optional[str] = Field(None, description="叶子节点最后编辑时间")
+    # 🆕 混合搜索相关字段
+    search_source: Optional[str] = Field(None, description="搜索来源：llm_judgment 或 embedding")
+    semantic_score: Optional[float] = Field(None, description="语义相似度得分（embedding搜索）")
 
 
 class RelatedPageResult(BaseModel):

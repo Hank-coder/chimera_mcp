@@ -68,7 +68,7 @@ async def demo_intent_search():
             result = await search_user_intent(
                 user_input=query,
                 confidence_threshold=0.6,  # 降低阈值以获得更多结果
-                max_results=1,  # 只返回1个最佳结果
+                max_results=3,  # 返回3个结果
                 expansion_depth=1  # 最小扩展深度（Pydantic验证要求>=1）
             )
             
@@ -177,7 +177,7 @@ async def interactive_search():
             result = await search_user_intent(
                 user_input=user_input,
                 confidence_threshold=0.5,
-                max_results=1,  # 只返回最佳结果
+                max_results=5,  # 返回5个结果
                 expansion_depth=1  # 最小扩展深度（Pydantic验证要求>=1）
             )
             
