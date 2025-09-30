@@ -742,6 +742,268 @@ class IntentSearchEngine:
             return []
 
 
+    async def search_only(
+        self,
+        query: str,
+        speed: bool = True,
+        max_results: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        仅执行搜索，返回页面ID列表和基础元数据（不获取完整内容）
+
+        这是GPT MCP标准search工具的核心方法，复用现有search_by_intent逻辑。
+
+        Args:
+            query: 搜索查询字符串
+            speed: 速度模式（True=仅embedding，False=混合搜索）
+            max_results: 最大返回结果数
+
+        Returns:
+            List[Dict] with keys: id, title, url
+            例如: [
+                {"id": "page-id-1", "title": "页面标题1", "url": "https://..."},
+                {"id": "page-id-2", "title": "页面标题2", "url": "https://..."}
+            ]
+        """
+        try:
+            # 复用现有search_by_intent逻辑
+            result = await self.search_by_intent(query, speed=speed, max_results=max_results)
+
+            search_results = []
+            if result.success and result.confidence_paths:
+                for path in result.confidence_paths:
+                    search_results.append({
+                        'id': path.core_page.notion_id,
+                        'title': path.core_page.title,
+                        'url': path.core_page.url
+                    })
+
+            print(f"✅ search_only完成，找到 {len(search_results)} 个结果")
+            return search_results
+
+        except Exception as e:
+            print(f"❌ search_only失败: {e}")
+            return []
+
+    async def fetch_by_ids(
+        self,
+        page_ids: List[str],
+        include_children: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        根据页面ID列表并发获取完整路径的所有页面内容
+
+        这是GPT MCP标准fetch工具的核心方法，会获取每个ID的完整路径上所有页面的内容。
+
+        Args:
+            page_ids: 要获取的叶子页面ID列表
+            include_children: 是否包含子页面（暂未实现）
+
+        Returns:
+            List[Dict] with keys: id, title, text, url, metadata, path_info
+            例如: [
+                {
+                    "id": "leaf-page-id",
+                    "title": "叶子页面标题",
+                    "text": "叶子页面完整内容...",
+                    "url": "https://...",
+                    "metadata": {
+                        "last_edited_time": "...",
+                        "path_string": "Root -> Parent -> Leaf",
+                        "path_contents": [
+                            {"title": "Root", "content": "...", "position": 0},
+                            {"title": "Parent", "content": "...", "position": 1},
+                            {"title": "Leaf", "content": "...", "position": 2}
+                        ]
+                    }
+                }
+            ]
+        """
+        try:
+            # 首先需要获取每个page_id的完整路径信息
+            # 从缓存或搜索结果中获取路径信息
+            fetch_results = []
+
+            for page_id in page_ids:
+                try:
+                    # 1. 获取叶子页面的路径信息（从缓存）
+                    path_info = await self._get_path_info_for_page(page_id)
+
+                    if not path_info:
+                        # 如果缓存中没有，只获取单个页面
+                        print(f"⚠️ 页面 {page_id} 没有找到路径信息，只获取单页内容")
+                        single_result = await self._fetch_single_page(page_id)
+                        if single_result:
+                            fetch_results.append(single_result)
+                        continue
+
+                    # 2. 获取路径上所有页面的内容
+                    path_ids = path_info.get('path_ids', [page_id])
+                    path_titles = path_info.get('path_titles', [path_info.get('title', 'Unknown')])
+                    path_string = path_info.get('path_string', path_info.get('title', 'Unknown'))
+
+                    # 3. 并发获取路径上所有页面的内容
+                    from utils.page_content_fetcher import PageContentFetcher
+                    fetcher = PageContentFetcher(self.notion_client)
+
+                    path_page_results = await fetcher.get_multiple_pages_content(
+                        page_ids=path_ids,
+                        config={
+                            'include_files': True,
+                            'include_tables': True,
+                            'max_content_length': 10000
+                        },
+                        purpose='fetch_tool_with_path'
+                    )
+
+                    # 4. 构建路径内容数组
+                    path_contents = []
+                    for i, (pid, ptitle) in enumerate(zip(path_ids, path_titles)):
+                        # 找到对应的内容
+                        page_content = ""
+                        last_edited_time = ""
+                        for page_result in path_page_results:
+                            if page_result['page_id'] == pid:
+                                if page_result['success']:
+                                    page_content = page_result['content']
+                                    last_edited_time = page_result['timestamp']
+                                else:
+                                    page_content = f"📄 路径页面: {ptitle} (内容获取失败)"
+                                break
+
+                        if not page_content and pid != page_id:
+                            # 不是叶子节点且没有内容，使用占位符
+                            page_content = f"📄 路径页面: {ptitle}"
+
+                        path_contents.append({
+                            "position": i,
+                            "title": ptitle,
+                            "notion_id": pid,
+                            "content": page_content,
+                            "content_length": len(page_content),
+                            "last_edited_time": last_edited_time,
+                            "is_leaf": (pid == page_id)
+                        })
+
+                    # 5. 找到叶子页面的完整内容（作为主内容）
+                    leaf_content = ""
+                    leaf_url = path_info.get('url', '')
+                    leaf_last_edited = path_info.get('last_edited_time', '')
+
+                    for content_item in path_contents:
+                        if content_item['is_leaf']:
+                            leaf_content = content_item['content']
+                            leaf_last_edited = content_item['last_edited_time']
+                            break
+
+                    # 6. 构建fetch结果
+                    fetch_results.append({
+                        'id': page_id,
+                        'title': path_info.get('title', 'Unknown'),
+                        'text': leaf_content,
+                        'url': leaf_url,
+                        'metadata': {
+                            'last_edited_time': leaf_last_edited,
+                            'content_length': len(leaf_content),
+                            'path_string': path_string,
+                            'path_contents': path_contents,
+                            'total_path_pages': len(path_contents)
+                        }
+                    })
+
+                except Exception as e:
+                    print(f"❌ 获取页面 {page_id} 路径内容失败: {e}")
+                    # 尝试只获取单页内容作为降级
+                    single_result = await self._fetch_single_page(page_id)
+                    if single_result:
+                        fetch_results.append(single_result)
+
+            print(f"✅ fetch_by_ids完成，成功获取 {len(fetch_results)} / {len(page_ids)} 个页面及其路径内容")
+            return fetch_results
+
+        except Exception as e:
+            print(f"❌ fetch_by_ids失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    async def _get_path_info_for_page(self, page_id: str) -> Optional[Dict[str, Any]]:
+        """从缓存中获取页面的路径信息"""
+        try:
+            from pathlib import Path
+            cache_file = Path("llm_cache/chimera_cache.json")
+
+            if not cache_file.exists():
+                return None
+
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+
+            # 查找包含此page_id的路径
+            for path_data in cache_data.get("paths", []):
+                if path_data["leaf_id"] == page_id:
+                    return {
+                        'path_string': path_data["path_string"],
+                        'path_ids': path_data["path_ids"],
+                        'path_titles': path_data["path_titles"],
+                        'title': path_data["leaf_title"],
+                        'url': cache_data["pages"].get(page_id, {}).get("url", ""),
+                        'last_edited_time': cache_data["pages"].get(page_id, {}).get("lastEditedTime", "")
+                    }
+
+            return None
+
+        except Exception as e:
+            print(f"⚠️ 从缓存获取路径信息失败: {e}")
+            return None
+
+    async def _fetch_single_page(self, page_id: str) -> Optional[Dict[str, Any]]:
+        """获取单个页面内容（降级方案）"""
+        try:
+            from utils.page_content_fetcher import PageContentFetcher
+            fetcher = PageContentFetcher(self.notion_client)
+
+            content, timestamp, metadata = await fetcher.get_page_content(
+                page_id=page_id,
+                config={
+                    'include_files': True,
+                    'include_tables': True,
+                    'max_content_length': 10000
+                },
+                purpose='fetch_tool_single'
+            )
+
+            # 获取基本信息
+            normalized_id = self.notion_client._normalize_page_id(page_id)
+            page_info = await self.notion_client.extractor.get_page_basic_info(normalized_id)
+
+            return {
+                'id': page_id,
+                'title': page_info.get('title', 'Unknown') if page_info else 'Unknown',
+                'text': content,
+                'url': page_info.get('url', '') if page_info else '',
+                'metadata': {
+                    'last_edited_time': timestamp,
+                    'content_length': len(content),
+                    'path_string': page_info.get('title', 'Unknown') if page_info else 'Unknown',
+                    'path_contents': [{
+                        'position': 0,
+                        'title': page_info.get('title', 'Unknown') if page_info else 'Unknown',
+                        'notion_id': page_id,
+                        'content': content,
+                        'content_length': len(content),
+                        'last_edited_time': timestamp,
+                        'is_leaf': True
+                    }],
+                    'total_path_pages': 1
+                }
+            }
+
+        except Exception as e:
+            print(f"❌ 获取单页内容失败: {e}")
+            return None
+
+
 # 便利函数
 async def search_user_intent(user_input: str, **kwargs) -> IntentSearchResponse:
     """

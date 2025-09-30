@@ -417,3 +417,45 @@ RESEARCH_COMPLEXITY_CONFIGS = {
         target_summary_length=2500
     )
 }
+
+
+# ==================== GPT MCP标准工具模型 ====================
+# 符合GPT MCP标准的search和fetch工具的Pydantic模型定义
+
+class SearchToolInput(BaseModel):
+    """GPT MCP标准search工具输入模型"""
+    query: str = Field(..., description="搜索查询字符串")
+    speed: bool = Field(default=True, description="速度模式：True=仅embedding搜索，False=混合搜索")
+    max_results: int = Field(default=5, ge=1, le=10, description="最大返回结果数量")
+
+
+class SearchResultItem(BaseModel):
+    """单个搜索结果项"""
+    id: str = Field(..., description="Notion页面ID")
+    title: str = Field(..., description="页面标题")
+    url: str = Field(..., description="页面URL")
+
+
+class SearchToolResponse(BaseModel):
+    """Search工具响应（GPT MCP标准格式）"""
+    results: List[SearchResultItem] = Field(..., description="搜索结果列表")
+
+
+class FetchToolInput(BaseModel):
+    """GPT MCP标准fetch工具输入模型"""
+    page_ids: List[str] = Field(..., description="要获取内容的页面ID列表")
+    include_children: bool = Field(default=False, description="是否包含子页面内容")
+
+
+class FetchResultItem(BaseModel):
+    """单个fetch结果项"""
+    id: str = Field(..., description="页面ID")
+    title: str = Field(..., description="页面标题")
+    text: str = Field(..., description="页面完整文本内容")
+    url: str = Field(..., description="页面URL")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="页面元数据")
+
+
+class FetchToolResponse(BaseModel):
+    """Fetch工具响应（GPT MCP标准格式）"""
+    results: List[FetchResultItem] = Field(..., description="获取结果列表")

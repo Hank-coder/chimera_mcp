@@ -20,12 +20,21 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from agents.intent_search import search_user_intent
+from agents.intent_search import search_user_intent, IntentSearchEngine
 from agents.deep_research import ContextEngineeringDirector
 from utils.fastmcp_utils import get_bearer_token
 from config.settings import get_settings
 from core.wechat_search import search_wechat_relationships
-from core.models import DeepResearchRequest
+from core.models import (
+    DeepResearchRequest,
+    SearchToolInput,
+    SearchToolResponse,
+    SearchResultItem,
+    FetchToolInput,
+    FetchToolResponse,
+    FetchResultItem
+)
+import json
 
 
 # Pydantic模型定义
@@ -482,7 +491,164 @@ class ChimeraFastMCPServer:
                     data={"research_context": None},
                     message=f"深度研究失败: {str(e)}"
                 )
-    
+
+        # ==================== GPT MCP标准工具 ====================
+
+        @self.mcp.tool(
+            title="搜索页面ID（Notion）",
+            description=(
+                "🔍 GPT MCP标准search工具 - 搜索Notion并返回相关页面ID列表。\n\n"
+                "**功能**：从Notion知识库中搜索相关页面，返回页面ID、标题、URL列表。\n\n"
+                "**参数**：\n"
+                "- query (str): 搜索查询字符串\n"
+                "- speed (bool, 默认true): 速度模式（true=仅embedding搜索，false=混合搜索）\n"
+                "- max_results (int, 默认5): 最大返回结果数（1-10）\n\n"
+                "**返回格式**：\n"
+                "```json\n"
+                "{\n"
+                "  \"results\": [\n"
+                "    {\"id\": \"page-id-1\", \"title\": \"页面标题1\", \"url\": \"https://...\"},\n"
+                "    {\"id\": \"page-id-2\", \"title\": \"页面标题2\", \"url\": \"https://...\"}\n"
+                "  ]\n"
+                "}\n"
+                "```\n\n"
+                "**使用建议**：先使用此工具获取ID列表，再使用fetch工具按需获取内容。"
+            )
+        )
+        async def search(params: SearchToolInput, ctx: Context):
+            """GPT MCP标准search工具"""
+            try:
+                # 认证检查
+                if not self._validate_auth(ctx):
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({"results": []}, ensure_ascii=False)
+                        }]
+                    }
+
+                logger.debug(f"Search tool request: query={params.query}, speed={params.speed}, max_results={params.max_results}")
+
+                # 创建搜索引擎实例
+                engine = IntentSearchEngine()
+
+                # 调用search_only获取ID列表
+                results = await engine.search_only(
+                    query=params.query,
+                    speed=params.speed,
+                    max_results=params.max_results
+                )
+
+                # 构建GPT MCP标准响应
+                response = SearchToolResponse(
+                    results=[SearchResultItem(**r) for r in results]
+                )
+
+                logger.debug(f"Search tool completed: {len(results)} results found")
+
+                # 返回GPT MCP标准格式
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps(response.model_dump(), ensure_ascii=False)
+                    }]
+                }
+
+            except Exception as e:
+                logger.exception(f"Error in search tool: {e}")
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps({"results": []}, ensure_ascii=False)
+                    }]
+                }
+
+        @self.mcp.tool(
+            title="获取页面内容（Notion）",
+            description=(
+                "📄 GPT MCP标准fetch工具 - 根据页面ID列表批量获取完整路径内容。\n\n"
+                "**功能**：并发获取多个Notion页面及其完整路径上所有页面的内容。\n\n"
+                "**参数**：\n"
+                "- page_ids (List[str]): 要获取的叶子页面ID列表\n"
+                "- include_children (bool, 默认false): 是否包含子页面（暂未实现）\n\n"
+                "**返回格式**：\n"
+                "```json\n"
+                "{\n"
+                "  \"results\": [\n"
+                "    {\n"
+                "      \"id\": \"leaf-page-id\",\n"
+                "      \"title\": \"叶子页面标题\",\n"
+                "      \"text\": \"叶子页面完整内容...\",\n"
+                "      \"url\": \"https://...\",\n"
+                "      \"metadata\": {\n"
+                "        \"last_edited_time\": \"2024-01-01T00:00:00\",\n"
+                "        \"content_length\": 5000,\n"
+                "        \"path_string\": \"Root -> Parent -> Leaf\",\n"
+                "        \"path_contents\": [\n"
+                "          {\"title\": \"Root\", \"content\": \"...\", \"position\": 0},\n"
+                "          {\"title\": \"Parent\", \"content\": \"...\", \"position\": 1},\n"
+                "          {\"title\": \"Leaf\", \"content\": \"...\", \"position\": 2, \"is_leaf\": true}\n"
+                "        ],\n"
+                "        \"total_path_pages\": 3\n"
+                "      }\n"
+                "    }\n"
+                "  ]\n"
+                "}\n"
+                "```\n\n"
+                "**特性**：\n"
+                "- 自动获取完整路径上所有页面的内容\n"
+                "- text字段为叶子页面主内容\n"
+                "- metadata.path_contents包含路径上所有页面内容\n\n"
+                "**使用建议**：配合search工具使用，先搜索获取ID列表，再选择性获取完整路径内容。"
+            )
+        )
+        async def fetch(params: FetchToolInput, ctx: Context):
+            """GPT MCP标准fetch工具"""
+            try:
+                # 认证检查
+                if not self._validate_auth(ctx):
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({"results": []}, ensure_ascii=False)
+                        }]
+                    }
+
+                logger.debug(f"Fetch tool request: page_ids={params.page_ids}, include_children={params.include_children}")
+
+                # 创建搜索引擎实例
+                engine = IntentSearchEngine()
+
+                # 调用fetch_by_ids获取内容
+                results = await engine.fetch_by_ids(
+                    page_ids=params.page_ids,
+                    include_children=params.include_children
+                )
+
+                # 构建GPT MCP标准响应
+                response = FetchToolResponse(
+                    results=[FetchResultItem(**r) for r in results]
+                )
+
+                logger.debug(f"Fetch tool completed: {len(results)} pages fetched")
+
+                # 返回GPT MCP标准格式
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps(response.model_dump(), ensure_ascii=False)
+                    }]
+                }
+
+            except Exception as e:
+                logger.exception(f"Error in fetch tool: {e}")
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps({"results": []}, ensure_ascii=False)
+                    }]
+                }
+
     def run(self, host: str = "0.0.0.0", port: int = 3000):
         """启动Streamable HTTP MCP服务器"""
         logger.info(f"Starting Chimera FastMCP Server on http://{host}:{port}/mcp")
