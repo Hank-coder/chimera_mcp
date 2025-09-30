@@ -110,9 +110,7 @@ class WeChatRelationshipSearcher:
             for entity in matched_entities:
                 entity_uuid = entity.get('uuid', '')
                 entity_name = entity.get('name', '')
-                
-                logger.info(f"为实体 '{entity_name}' ({entity_uuid}) 搜索关系")
-                
+
                 # 获取该实体的关系信息
                 entity_relationships = await self._get_entity_relationships(entity_uuid)
                 
@@ -190,25 +188,46 @@ class WeChatRelationshipSearcher:
             
             # 使用高级搜索配置
             search_config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
-            search_config.limit = max_results * 2  # 搜索更多结果用于筛选
-            
-            # 执行高级搜索 - 基于官方MCP的search_方法
-            # 同时搜索微信关系和个人记忆两个group_id
-            search_results = await self.client.graphiti.search_(
-                query=query,
-                config=search_config,
-                group_ids=["wechat_relationships", "personal_memories"],
-                search_filter=search_filter
-            )
-            
-            if not search_results.nodes:
+            search_config.limit = max_results * 2  # 每个group搜索 max_results * 2
+
+            # 策略：分别搜索两个group，然后合并结果
+            # 这样可以避免RRF算法在多group时的排序问题
+            all_nodes = []
+
+            # 1. 搜索 wechat_relationships
+            try:
+                results_wechat = await self.client.graphiti.search_(
+                    query=query,
+                    config=search_config,
+                    group_ids=["wechat_relationships"],
+                    search_filter=search_filter
+                )
+                if results_wechat.nodes:
+                    all_nodes.extend(results_wechat.nodes)
+            except Exception as e:
+                logger.warning(f"搜索 wechat_relationships 失败: {e}")
+
+            # 2. 搜索 personal_memories
+            try:
+                results_personal = await self.client.graphiti.search_(
+                    query=query,
+                    config=search_config,
+                    group_ids=["personal_memories"],
+                    search_filter=search_filter
+                )
+                if results_personal.nodes:
+                    all_nodes.extend(results_personal.nodes)
+            except Exception as e:
+                logger.warning(f"搜索 personal_memories 失败: {e}")
+
+            if not all_nodes:
                 logger.warning(f"Graphiti高级搜索未找到Entity节点: {query}")
                 return []
-            
+
             # 格式化节点结果 - 基于官方MCP的格式化方法
             formatted_entities = []
-            
-            for node in search_results.nodes:
+
+            for node in all_nodes:
                 try:
                     # 使用官方的格式化方法
                     entity_dict = {
@@ -236,9 +255,7 @@ class WeChatRelationshipSearcher:
             MIN_SCORE_THRESHOLD = 3.0
             filtered_entities = [e for e in sorted_entities if e.get('score', 0) >= MIN_SCORE_THRESHOLD]
 
-            logger.info(f"Graphiti搜索找到 {len(sorted_entities)} 个匹配的Entity，过滤后保留 {len(filtered_entities)} 个")
-            for i, entity in enumerate(filtered_entities[:5]):
-                logger.info(f"Entity {i+1}: {entity.get('name', 'N/A')} (score: {entity.get('score', 0):.2f})")
+            logger.info(f"找到 {len(filtered_entities)} 个匹配实体")
 
             return filtered_entities[:max_results]
             
@@ -349,7 +366,6 @@ class WeChatRelationshipSearcher:
                     }
                     relationships.append(relationship)
 
-                logger.info(f"为Entity {entity_uuid} 找到 {len(relationships)} 个关系（去重后）")
                 return relationships
 
         except Exception as e:
