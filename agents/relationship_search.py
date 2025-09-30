@@ -231,12 +231,16 @@ class WeChatRelationshipSearcher:
             
             # 按得分排序
             sorted_entities = sorted(formatted_entities, key=lambda x: x.get('score', 0), reverse=True)
-            
-            logger.info(f"Graphiti搜索找到 {len(sorted_entities)} 个匹配的Entity")
-            for i, entity in enumerate(sorted_entities[:5]):
+
+            # 过滤掉低分实体 - 最低分数阈值为1.0
+            MIN_SCORE_THRESHOLD = 1.0
+            filtered_entities = [e for e in sorted_entities if e.get('score', 0) >= MIN_SCORE_THRESHOLD]
+
+            logger.info(f"Graphiti搜索找到 {len(sorted_entities)} 个匹配的Entity，过滤后保留 {len(filtered_entities)} 个")
+            for i, entity in enumerate(filtered_entities[:5]):
                 logger.info(f"Entity {i+1}: {entity.get('name', 'N/A')} (score: {entity.get('score', 0):.2f})")
-            
-            return sorted_entities[:max_results]
+
+            return filtered_entities[:max_results]
             
         except Exception as e:
             logger.error(f"Graphiti Entity搜索失败: {e}")
@@ -294,17 +298,17 @@ class WeChatRelationshipSearcher:
 
     async def _get_entity_relationships(self, entity_uuid: str) -> List[Dict[str, Any]]:
         """
-        第二步：获取Entity的关系信息
-        
+        第二步：获取Entity的关系信息（去重版本）
+
         Args:
             entity_uuid: 实体UUID
-            
+
         Returns:
-            List[Dict[str, Any]]: 关系信息列表
+            List[Dict[str, Any]]: 去重后的关系信息列表
         """
         if not self._neo4j_driver:
             return []
-            
+
         try:
             async with self._neo4j_driver.session() as session:
                 # 查询与该实体相关的所有关系和连接的其他实体
@@ -317,25 +321,37 @@ class WeChatRelationshipSearcher:
                        type(r) as relationship_type
                 LIMIT 20
                 """
-                
+
                 result = await session.run(query, uuid=entity_uuid)
-                
+
                 relationships = []
+                seen_uuids = set()  # 用于去重：只保留每个other_uuid的第一个关系
+
                 async for record in result:
+                    other_uuid = record.get('other_uuid', '')
+
+                    # 如果这个UUID已经处理过，跳过（保留第一个关系描述）
+                    if other_uuid in seen_uuids:
+                        continue
+
+                    seen_uuids.add(other_uuid)
+
+                    fact = record.get('fact', '')
+
                     relationship = {
-                        'fact': record.get('fact', ''),
+                        'fact': fact,
                         'relationship_type': record.get('relationship_type', ''),
                         'other_entity': {
-                            'uuid': record.get('other_uuid', ''),
+                            'uuid': other_uuid,
                             'name': record.get('other_name', ''),
                             'summary': record.get('other_summary', '')
                         }
                     }
                     relationships.append(relationship)
-                    
-                logger.info(f"为Entity {entity_uuid} 找到 {len(relationships)} 个关系")
+
+                logger.info(f"为Entity {entity_uuid} 找到 {len(relationships)} 个关系（去重后）")
                 return relationships
-                
+
         except Exception as e:
             logger.error(f"获取Entity关系失败: {e}")
             return []
@@ -409,19 +425,29 @@ class WeChatRelationshipSearcher:
                 # 单字母查询的匹配度需要很高的名称相似度
                 score += 6.0
         
-        # 7. 摘要匹配 (较低权重)
+        # 7. 摘要匹配 (提高权重 - 因为Graphiti的语义搜索已经很好)
         summary = entity.get('summary', '').lower()
         if summary and query_lower in summary:
-            score += 1.5
-        
-        # 8. 属性匹配 (最低权重)
+            # 查询词在摘要中出现，说明语义相关性高
+            score += 3.0
+
+            # 如果摘要开头就提到查询词，权重更高
+            if summary.startswith(query_lower):
+                score += 2.0
+
+        # 8. 属性匹配 (中等权重)
         attributes = entity.get('attributes', {})
         if attributes:
             for key, value in attributes.items():
                 if query_lower in str(value).lower():
-                    score += 0.5
+                    score += 1.5
                     break
-        
+
+        # 9. 如果到这里分数还是0，说明完全不相关
+        # 但如果Entity名称很短（1-2个字），给一个基础分避免误伤
+        if score == 0 and len(name) <= 2:
+            score = 0.5
+
         return score
     
     def _calculate_common_substring_ratio(self, str1: str, str2: str) -> float:
