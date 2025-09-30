@@ -213,21 +213,21 @@ class ChimeraFastMCPServer:
         """设置MCP工具"""
 
         @self.mcp.tool(
-            title="文档标准搜索（Notion）",
+            title="个人知识库搜索（Notion）",
             description=(
-                    "这是我（陈宇函）的个人知识库Chimera**简单/标准搜索**工具，侧重于单文档。"
+                    "这是我（陈宇函）的个人知识库Chimera**简单/标准搜索**工具。"
                     "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
                     "🔍 **搜索模式（可选）**：\n"
-                    " - 速度模式 (speed=true) ：仅使用embedding语义搜索，速度快\n\n"
+                    " - 速度模式 (speed=true) ：默认使用embedding语义搜索，速度快\n\n"
                     " - 标准模式 (speed=false)：使用LLM判断+embedding搜索的混合策略，准确性高\n"
                     "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
-                    " - query (字符串，必填)：搜索关键词或短语（如有时间信息请包含），示例：\"上周碳中和计划\"\n"
+                    " - query (字符串，必填)：搜索短语或关键词 包含中英文 方便进行Embedding相似度搜索\n"
                     " - search_results (整数,可选,默认5)：返回的最大搜索结果条数\n"
                     " - speed (布尔值，可选，默认true)：速度模式开关，true=仅embedding搜索（快），false=混合搜索（准确）\n"
                     "**性能建议**：默认使用速度模式, 高准确性时使用标准模式；。\n\n"
                     "示例参数JSON格式：\n"
                     "{\n"
-                    "  \"query\": \"碳中和项目进展\",\n"
+                    "  \"query\": \"计算机视觉图像处理 image processing \",\n"
                     "  \"search_results\": 5\n"
                     "}"
             )
@@ -528,7 +528,7 @@ class ChimeraFastMCPServer:
         @self.mcp.tool(
             title="搜索页面ID（Notion）",
             description=(
-                "🔍 GPT MCP标准search工具 - 搜索Notion并返回相关页面ID列表。\n\n"
+                "GPT MCP标准search工具 - 搜索Notion并返回相关页面ID列表。\n\n"
                 "**功能**：从Notion知识库中搜索相关页面，返回页面ID、标题、URL列表。\n\n"
                 "**参数**：\n"
                 "- query (str): 搜索查询字符串\n\n"
@@ -595,7 +595,7 @@ class ChimeraFastMCPServer:
         @self.mcp.tool(
             title="获取页面内容（Notion）",
             description=(
-                "📄 GPT MCP标准fetch工具 - 根据页面ID批量获取完整路径内容。\n\n"
+                "GPT MCP标准fetch工具 - 根据页面ID批量获取完整路径内容。\n\n"
                 "**功能**：并发获取多个Notion页面及其完整路径上所有页面的内容。\n\n"
                 "**参数**：\n"
                 "- id (str): 页面ID字符串，支持三种格式：\n"
