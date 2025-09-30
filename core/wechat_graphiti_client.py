@@ -26,7 +26,7 @@ from graphiti_core.cross_encoder.gemini_reranker_client import GeminiRerankerCli
 class WeChatGraphitiClient:
     """微信关系图谱 - Graphiti客户端"""
     
-    def __init__(self, use_2_0_flash: bool = False):
+    def __init__(self, use_2_0_flash: bool = True):
         self.graphiti: Optional[Graphiti] = None
         self._initialized = False
         self._use_2_0_flash = use_2_0_flash
