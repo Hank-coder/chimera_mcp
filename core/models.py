@@ -423,10 +423,8 @@ RESEARCH_COMPLEXITY_CONFIGS = {
 # 符合GPT MCP标准的search和fetch工具的Pydantic模型定义
 
 class SearchToolInput(BaseModel):
-    """GPT MCP标准search工具输入模型"""
+    """GPT MCP标准search工具输入模型 - ChatGPT兼容"""
     query: str = Field(..., description="搜索查询字符串")
-    speed: bool = Field(default=True, description="速度模式：True=仅embedding搜索，False=混合搜索")
-    max_results: int = Field(default=5, ge=1, le=10, description="最大返回结果数量")
 
 
 class SearchResultItem(BaseModel):
@@ -442,9 +440,16 @@ class SearchToolResponse(BaseModel):
 
 
 class FetchToolInput(BaseModel):
-    """GPT MCP标准fetch工具输入模型"""
-    page_ids: List[str] = Field(..., description="要获取内容的页面ID列表")
-    include_children: bool = Field(default=False, description="是否包含子页面内容")
+    """GPT MCP标准fetch工具输入模型 - ChatGPT兼容，支持单ID或多ID"""
+    page_id: str = Field(
+        ...,
+        description=(
+            "页面ID字符串，支持三种格式：\n"
+            "1. 单个ID: 'page-id-1'\n"
+            "2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'\n"
+            "3. JSON数组: '[\"page-id-1\", \"page-id-2\"]'"
+        )
+    )
 
 
 class FetchResultItem(BaseModel):

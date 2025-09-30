@@ -10,7 +10,7 @@ import subprocess
 import sys
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
 from loguru import logger
@@ -176,7 +176,39 @@ class ChimeraFastMCPServer:
         except Exception as e:
             logger.warning(f"Bearer认证失败：{str(e)}")
             return False
-    
+
+    def _parse_page_ids(self, page_id_str: str) -> List[str]:
+        """
+        解析page_id字符串为ID列表
+
+        支持三种格式：
+        1. 单个ID: 'page-id-1'
+        2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'
+        3. JSON数组: '["page-id-1", "page-id-2"]'
+        """
+        try:
+            page_id_str = page_id_str.strip()
+
+            # 情况1: JSON数组格式
+            if page_id_str.startswith('[') and page_id_str.endswith(']'):
+                try:
+                    page_ids = json.loads(page_id_str)
+                    if isinstance(page_ids, list):
+                        return [str(pid).strip() for pid in page_ids if pid]
+                except json.JSONDecodeError:
+                    pass
+
+            # 情况2: 逗号分隔格式
+            if ',' in page_id_str:
+                return [pid.strip() for pid in page_id_str.split(',') if pid.strip()]
+
+            # 情况3: 单个ID
+            return [page_id_str] if page_id_str else []
+
+        except Exception as e:
+            logger.error(f"解析page_id失败: {e}")
+            return []
+
     def _setup_tools(self):
         """设置MCP工具"""
 
@@ -500,9 +532,7 @@ class ChimeraFastMCPServer:
                 "🔍 GPT MCP标准search工具 - 搜索Notion并返回相关页面ID列表。\n\n"
                 "**功能**：从Notion知识库中搜索相关页面，返回页面ID、标题、URL列表。\n\n"
                 "**参数**：\n"
-                "- query (str): 搜索查询字符串\n"
-                "- speed (bool, 默认true): 速度模式（true=仅embedding搜索，false=混合搜索）\n"
-                "- max_results (int, 默认5): 最大返回结果数（1-10）\n\n"
+                "- query (str): 搜索查询字符串\n\n"
                 "**返回格式**：\n"
                 "```json\n"
                 "{\n"
@@ -516,7 +546,7 @@ class ChimeraFastMCPServer:
             )
         )
         async def search(params: SearchToolInput, ctx: Context):
-            """GPT MCP标准search工具"""
+            """GPT MCP标准search工具 - ChatGPT兼容版本"""
             try:
                 # 认证检查
                 if not self._validate_auth(ctx):
@@ -527,16 +557,16 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                logger.debug(f"Search tool request: query={params.query}, speed={params.speed}, max_results={params.max_results}")
+                logger.debug(f"Search tool request: query={params.query}")
 
                 # 创建搜索引擎实例
                 engine = IntentSearchEngine()
 
-                # 调用search_only获取ID列表
+                # 调用search_only获取ID列表（使用默认参数：speed=True, max_results=5）
                 results = await engine.search_only(
                     query=params.query,
-                    speed=params.speed,
-                    max_results=params.max_results
+                    speed=True,  # 默认使用速度模式
+                    max_results=5  # 默认返回5个结果
                 )
 
                 # 构建GPT MCP标准响应
@@ -566,11 +596,13 @@ class ChimeraFastMCPServer:
         @self.mcp.tool(
             title="获取页面内容（Notion）",
             description=(
-                "📄 GPT MCP标准fetch工具 - 根据页面ID列表批量获取完整路径内容。\n\n"
+                "📄 GPT MCP标准fetch工具 - 根据页面ID批量获取完整路径内容。\n\n"
                 "**功能**：并发获取多个Notion页面及其完整路径上所有页面的内容。\n\n"
                 "**参数**：\n"
-                "- page_ids (List[str]): 要获取的叶子页面ID列表\n"
-                "- include_children (bool, 默认false): 是否包含子页面（暂未实现）\n\n"
+                "- page_id (str): 页面ID字符串，支持三种格式：\n"
+                "  1. 单个ID: 'page-id-1'\n"
+                "  2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'\n"
+                "  3. JSON数组: '[\"page-id-1\", \"page-id-2\"]'\n\n"
                 "**返回格式**：\n"
                 "```json\n"
                 "{\n"
@@ -603,7 +635,7 @@ class ChimeraFastMCPServer:
             )
         )
         async def fetch(params: FetchToolInput, ctx: Context):
-            """GPT MCP标准fetch工具"""
+            """GPT MCP标准fetch工具 - ChatGPT兼容版本"""
             try:
                 # 认证检查
                 if not self._validate_auth(ctx):
@@ -614,15 +646,27 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                logger.debug(f"Fetch tool request: page_ids={params.page_ids}, include_children={params.include_children}")
+                # 解析page_id字符串为ID列表
+                page_ids = self._parse_page_ids(params.page_id)
+
+                if not page_ids:
+                    logger.warning(f"Invalid page_id format: {params.page_id}")
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({"results": []}, ensure_ascii=False)
+                        }]
+                    }
+
+                logger.debug(f"Fetch tool request: page_ids={page_ids} (parsed from: {params.page_id})")
 
                 # 创建搜索引擎实例
                 engine = IntentSearchEngine()
 
                 # 调用fetch_by_ids获取内容
                 results = await engine.fetch_by_ids(
-                    page_ids=params.page_ids,
-                    include_children=params.include_children
+                    page_ids=page_ids,
+                    include_children=False  # 默认不包含子页面
                 )
 
                 # 构建GPT MCP标准响应
