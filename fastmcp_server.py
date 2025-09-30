@@ -694,16 +694,17 @@ class ChimeraFastMCPServer:
                 }
 
     def run(self, host: str = "0.0.0.0", port: int = 3000):
-        """启动Streamable HTTP MCP服务器（SSE模式）"""
+        """启动Streamable HTTP MCP服务器"""
         # logger.info(f"Starting Chimera FastMCP Server on http://{host}:{port}/mcp")
 
         try:
-            # 使用SSE（Server-Sent Events）模式，兼容ChatGPT
+            # 使用Streamable HTTP传输运行服务器，兼容mcp-remote
             self.mcp.run(
-                transport="http",
+                # transport="http",
+                transport="sse",
                 host=host,
                 port=port,
-                stateless_http=False  # 启用SSE连接模式（ChatGPT要求）
+                # stateless_http=True  # 启用无状态HTTP模式
             )
         except Exception as e:
             logger.exception(f"Error running FastMCP server: {e}")
