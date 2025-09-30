@@ -727,7 +727,7 @@ class ChimeraFastMCPServer:
                 "- 与微信关系图谱统一检索"
                 "**注意**："
                 "-必须把今天 昨天等日期转化为准确的时间 （年月日 时分秒）"
-                "-Content要有总结性，方便知识图谱, 最多字数为300字"
+                "-Content要有总结性，简洁方便知识图谱构造就行, 最多字数为150字"
             )
         )
         async def write_personal_memory_tool(params: PersonalMemoryInput, ctx: Context) -> ChimeraResult:
