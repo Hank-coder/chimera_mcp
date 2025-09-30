@@ -599,7 +599,7 @@ class ChimeraFastMCPServer:
                 "📄 GPT MCP标准fetch工具 - 根据页面ID批量获取完整路径内容。\n\n"
                 "**功能**：并发获取多个Notion页面及其完整路径上所有页面的内容。\n\n"
                 "**参数**：\n"
-                "- identifier (str): 页面ID字符串，支持三种格式：\n"
+                "- id (str): 页面ID字符串，支持三种格式：\n"
                 "  1. 单个ID: 'page-id-1'\n"
                 "  2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'\n"
                 "  3. JSON数组: '[\"page-id-1\", \"page-id-2\"]'\n\n"
@@ -634,7 +634,7 @@ class ChimeraFastMCPServer:
                 "**使用建议**：配合search工具使用，先搜索获取ID列表，再选择性获取完整路径内容。"
             )
         )
-        async def fetch(identifier: str, ctx: Context):
+        async def fetch(id: str, ctx: Context):
             """GPT MCP标准fetch工具 - ChatGPT兼容版本"""
             try:
                 # 认证检查
@@ -646,11 +646,11 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                # 解析identifier字符串为ID列表
-                page_ids = self._parse_page_ids(identifier)
+                # 解析id字符串为ID列表
+                page_ids = self._parse_page_ids(id)
 
                 if not page_ids:
-                    logger.warning(f"Invalid identifier format: {identifier}")
+                    logger.warning(f"Invalid id format: {id}")
                     return {
                         "content": [{
                             "type": "text",
@@ -658,7 +658,7 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                logger.debug(f"Fetch tool request: page_ids={page_ids} (parsed from: {identifier})")
+                logger.debug(f"Fetch tool request: page_ids={page_ids} (parsed from: {id})")
 
                 # 创建搜索引擎实例
                 engine = IntentSearchEngine()
