@@ -464,3 +464,38 @@ class FetchResultItem(BaseModel):
 class FetchToolResponse(BaseModel):
     """Fetch工具响应（GPT MCP标准格式）"""
     results: List[FetchResultItem] = Field(..., description="获取结果列表")
+
+
+# ==================== 个人记忆写入工具模型 ====================
+
+class PersonalMemoryInput(BaseModel):
+    """个人记忆写入输入模型"""
+    content: str = Field(
+        ...,
+        description=(
+            "要记忆的内容，使用自然语言描述。\n"
+            "可以使用第一人称'我'，系统会理解为陈宇函。\n\n"
+            "示例:\n"
+            "- '我和JZX是同事，他擅长前端开发'\n"
+            "- '我参与了GREEN项目的kick-off会议'\n"
+            "- '我喜欢早上喝咖啡'\n"
+            "- 'JZX推荐我看《代码大全》这本书'"
+        )
+    )
+    memory_type: str = Field(
+        default="relationship",
+        description=(
+            "记忆类型:\n"
+            "- relationship: 人际关系（默认）\n"
+            "- preference: 个人偏好\n"
+            "- event: 事件参与\n"
+            "- fact: 事实记录"
+        )
+    )
+
+
+class PersonalMemoryResponse(BaseModel):
+    """个人记忆写入响应模型"""
+    success: bool = Field(..., description="写入是否成功")
+    message: str = Field(..., description="响应消息")
+    memory_id: Optional[str] = Field(None, description="记忆唯一ID")

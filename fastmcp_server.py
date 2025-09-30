@@ -24,7 +24,8 @@ from agents.intent_search import search_user_intent, IntentSearchEngine
 from agents.deep_research import ContextEngineeringDirector
 from utils.fastmcp_utils import get_bearer_token
 from config.settings import get_settings
-from core.wechat_search import search_wechat_relationships
+from agents.relationship_search import search_wechat_relationships
+from agents.personal_memory_writer import write_personal_memory
 from core.models import (
     DeepResearchRequest,
     SearchToolInput,
@@ -32,7 +33,9 @@ from core.models import (
     SearchResultItem,
     FetchToolInput,
     FetchToolResponse,
-    FetchResultItem
+    FetchResultItem,
+    PersonalMemoryInput,
+    PersonalMemoryResponse
 )
 import json
 
@@ -691,6 +694,78 @@ class ChimeraFastMCPServer:
                         "text": json.dumps({"results": []}, ensure_ascii=False)
                     }]
                 }
+
+        # ==================== 个人记忆写入工具 ====================
+
+        @self.mcp.tool(
+            title="写入个人记忆（我的关系图谱）",
+            description=(
+                "记录我（陈宇函/肥猫）与他人或事物的关系信息到知识图谱。\n\n"
+                "**工作原理**:\n"
+                "- 输入自然语言描述，可以用'我'代表陈宇函\n"
+                "- Graphiti自动理解上下文并提取实体和关系\n"
+                "- 存储到个人记忆图谱，可通过'社交关系搜索'检索\n\n"
+                "**适用场景**:\n"
+                "- 人际关系: '我和JZX是同事关系'\n"
+                "- 项目参与: '我于2025年9月30日参与了GREEN项目的开发'\n"
+                "- 个人偏好: '我喜欢用Python写代码'\n"
+                "- 事件记录: '我上周参加了技术分享会'\n"
+                "- 推荐记录: 'JZX推荐我看《代码大全》'\n\n"
+                "**参数**:\n"
+                "- content (str): 记忆内容（自然语言）\n"
+                "- memory_type (str): relationship|preference|event|fact\n\n"
+                "**特点**:\n"
+                "- 自动识别实体和关系\n"
+                "- 支持复杂关系描述\n"
+                "- 与微信关系图谱统一检索"
+                "**注意**："
+                "-必须把今天 昨天等日期转化为准确的时间 （年月日 时分秒）"
+            )
+        )
+        async def write_personal_memory_tool(params: PersonalMemoryInput, ctx: Context) -> ChimeraResult:
+            """个人记忆写入工具"""
+            try:
+                # 认证检查
+                if not self._validate_auth(ctx):
+                    return ChimeraResult(
+                        success=False,
+                        data={},
+                        message="Authentication failed"
+                    )
+
+                logger.debug(f"Writing personal memory: type={params.memory_type}, content_length={len(params.content)}")
+
+                # 调用写入函数
+                result = await write_personal_memory(
+                    content=params.content,
+                    memory_type=params.memory_type,
+                    source="chatgpt"
+                )
+
+                if result["success"]:
+                    return ChimeraResult(
+                        success=True,
+                        data={
+                            "memory_id": result.get("memory_id"),
+                            "memory_type": params.memory_type,
+                            "group_id": "personal_memories"
+                        },
+                        message=result["message"]
+                    )
+                else:
+                    return ChimeraResult(
+                        success=False,
+                        data={},
+                        message=result["message"]
+                    )
+
+            except Exception as e:
+                logger.exception(f"Error in write_personal_memory_tool: {e}")
+                return ChimeraResult(
+                    success=False,
+                    data={},
+                    message=f"写入记忆失败: {str(e)}"
+                )
 
     def run(self, host: str = "0.0.0.0", port: int = 3000):
         """启动Streamable HTTP MCP服务器"""

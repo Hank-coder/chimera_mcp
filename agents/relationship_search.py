@@ -1,7 +1,7 @@
 
 
 """
-微信关系搜索 - 使用 Graphiti 进行关系查询
+关系搜索 - 使用 Graphiti 进行关系查询
 基于 Graphiti 的 search_ 方法实现简单高效的关系搜索
 
 数据库结构:
@@ -45,7 +45,7 @@ class RelationshipSearchResult:
 
 
 class WeChatRelationshipSearcher:
-    """微信关系搜索器"""
+    """关系搜索器"""
 
     def __init__(self):
         self.client = WeChatGraphitiClient(use_2_0_flash=True)  # 使用gemini-2.0-flash
@@ -193,10 +193,11 @@ class WeChatRelationshipSearcher:
             search_config.limit = max_results * 2  # 搜索更多结果用于筛选
             
             # 执行高级搜索 - 基于官方MCP的search_方法
+            # 同时搜索微信关系和个人记忆两个group_id
             search_results = await self.client.graphiti.search_(
                 query=query,
                 config=search_config,
-                group_ids=["wechat_relationships"],
+                group_ids=["wechat_relationships", "personal_memories"],
                 search_filter=search_filter
             )
             
