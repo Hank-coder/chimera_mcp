@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Chimera 手动同步脚本
+Chimera 手动同步Notion界面
 专门用于手动全量同步和维护操作
 """
 

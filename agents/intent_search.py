@@ -674,11 +674,32 @@ class IntentSearchEngine:
                 limit=20,  # 多搜索一些候选
                 similarity_threshold=0.5  # 低阈值搜索更多候选
             )
-            # 3. 筛选高质量结果：只保留相似度 > 0.8 的top3
-            high_quality_results = [
-                result for result in search_results
-                if result['score'] > 0.8
-            ][:4]  # 取top4
+            # 3. 筛选高质量结果：Top-P阶梯式筛选（加快速度）
+            # 搜索结果已按score从高到低排序
+            # 策略：类似top-P采样，严格匹配阈值，没有达标返回空
+
+            QUALITY_TIERS = [
+                {'threshold': 0.98, 'target_count': 1, 'name': 'perfect'},      # 完美匹配
+                {'threshold': 0.95, 'target_count': 2, 'name': 'excellent'},    # 优秀
+                {'threshold': 0.90, 'target_count': 3, 'name': 'high'},         # 高质量
+                {'threshold': 0.83, 'target_count': 4, 'name': 'good'},         # 良好
+            ]
+
+            high_quality_results = []
+
+            # 遍历每个质量层级，找到第一个满足条件的层级
+            for tier in QUALITY_TIERS:
+                candidates = [r for r in search_results if r['score'] >= tier['threshold']]
+
+                if len(candidates) >= tier['target_count']:
+                    # 找到足够数量的高质量结果
+                    high_quality_results = candidates[:tier['target_count']]
+                    # print(f"✅ Embedding筛选: {tier['name']}级 | {len(high_quality_results)}个结果 | 阈值≥{tier['threshold']}")
+                    break
+
+            # 如果所有层级都不满足，返回空（严格模式）
+            if not high_quality_results:
+                print(f"Embedding筛选: 未达标，返回空结果")
 
             # 4. 转换为统一格式 - 只使用高质量结果
             for result in high_quality_results:
