@@ -545,7 +545,7 @@ class ChimeraFastMCPServer:
                 "**使用建议**：先使用此工具获取ID列表，再使用fetch工具按需获取内容。"
             )
         )
-        async def search(params: SearchToolInput, ctx: Context):
+        async def search(query: str, ctx: Context):
             """GPT MCP标准search工具 - ChatGPT兼容版本"""
             try:
                 # 认证检查
@@ -557,14 +557,14 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                logger.debug(f"Search tool request: query={params.query}")
+                logger.debug(f"Search tool request: query={query}")
 
                 # 创建搜索引擎实例
                 engine = IntentSearchEngine()
 
                 # 调用search_only获取ID列表（使用默认参数：speed=True, max_results=5）
                 results = await engine.search_only(
-                    query=params.query,
+                    query=query,
                     speed=True,  # 默认使用速度模式
                     max_results=5  # 默认返回5个结果
                 )
@@ -599,7 +599,7 @@ class ChimeraFastMCPServer:
                 "📄 GPT MCP标准fetch工具 - 根据页面ID批量获取完整路径内容。\n\n"
                 "**功能**：并发获取多个Notion页面及其完整路径上所有页面的内容。\n\n"
                 "**参数**：\n"
-                "- page_id (str): 页面ID字符串，支持三种格式：\n"
+                "- identifier (str): 页面ID字符串，支持三种格式：\n"
                 "  1. 单个ID: 'page-id-1'\n"
                 "  2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'\n"
                 "  3. JSON数组: '[\"page-id-1\", \"page-id-2\"]'\n\n"
@@ -634,7 +634,7 @@ class ChimeraFastMCPServer:
                 "**使用建议**：配合search工具使用，先搜索获取ID列表，再选择性获取完整路径内容。"
             )
         )
-        async def fetch(params: FetchToolInput, ctx: Context):
+        async def fetch(identifier: str, ctx: Context):
             """GPT MCP标准fetch工具 - ChatGPT兼容版本"""
             try:
                 # 认证检查
@@ -646,11 +646,11 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                # 解析page_id字符串为ID列表
-                page_ids = self._parse_page_ids(params.page_id)
+                # 解析identifier字符串为ID列表
+                page_ids = self._parse_page_ids(identifier)
 
                 if not page_ids:
-                    logger.warning(f"Invalid page_id format: {params.page_id}")
+                    logger.warning(f"Invalid identifier format: {identifier}")
                     return {
                         "content": [{
                             "type": "text",
@@ -658,7 +658,7 @@ class ChimeraFastMCPServer:
                         }]
                     }
 
-                logger.debug(f"Fetch tool request: page_ids={page_ids} (parsed from: {params.page_id})")
+                logger.debug(f"Fetch tool request: page_ids={page_ids} (parsed from: {identifier})")
 
                 # 创建搜索引擎实例
                 engine = IntentSearchEngine()
