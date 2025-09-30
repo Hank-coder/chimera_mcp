@@ -674,11 +674,11 @@ class IntentSearchEngine:
                 limit=20,  # 多搜索一些候选
                 similarity_threshold=0.5  # 低阈值搜索更多候选
             )
-            # 3. 筛选高质量结果：只保留相似度 > 0.75 的top3
+            # 3. 筛选高质量结果：只保留相似度 > 0.8 的top3
             high_quality_results = [
                 result for result in search_results
                 if result['score'] > 0.8
-            ][:3]  # 取top3
+            ][:4]  # 取top4
 
             # 4. 转换为统一格式 - 只使用高质量结果
             for result in high_quality_results:

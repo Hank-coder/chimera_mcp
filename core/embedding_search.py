@@ -314,7 +314,7 @@ async def test_embedding_search():
 
         for query in test_queries:
             print(f"\n搜索: '{query}'")
-            results = await search_service.search_similar_pages(query, limit=3, similarity_threshold=0.6)
+            results = await search_service.search_similar_pages(query, limit=5, similarity_threshold=0.6)
 
             if results:
                 print(f"找到 {len(results)} 个结果:")
