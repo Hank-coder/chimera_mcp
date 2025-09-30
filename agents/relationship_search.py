@@ -190,35 +190,32 @@ class WeChatRelationshipSearcher:
             search_config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
             search_config.limit = max_results * 2  # 每个group搜索 max_results * 2
 
-            # 策略：分别搜索两个group，然后合并结果
+            # 策略：并发搜索两个group，然后合并结果
             # 这样可以避免RRF算法在多group时的排序问题
             all_nodes = []
 
-            # 1. 搜索 wechat_relationships
-            try:
-                results_wechat = await self.client.graphiti.search_(
-                    query=query,
-                    config=search_config,
-                    group_ids=["wechat_relationships"],
-                    search_filter=search_filter
-                )
-                if results_wechat.nodes:
-                    all_nodes.extend(results_wechat.nodes)
-            except Exception as e:
-                logger.warning(f"搜索 wechat_relationships 失败: {e}")
+            # 并发搜索两个 group
+            async def search_group(group_id: str):
+                try:
+                    result = await self.client.graphiti.search_(
+                        query=query,
+                        config=search_config,
+                        group_ids=[group_id],
+                        search_filter=search_filter
+                    )
+                    return result.nodes if result.nodes else []
+                except Exception as e:
+                    logger.warning(f"搜索 {group_id} 失败: {e}")
+                    return []
 
-            # 2. 搜索 personal_memories
-            try:
-                results_personal = await self.client.graphiti.search_(
-                    query=query,
-                    config=search_config,
-                    group_ids=["personal_memories"],
-                    search_filter=search_filter
-                )
-                if results_personal.nodes:
-                    all_nodes.extend(results_personal.nodes)
-            except Exception as e:
-                logger.warning(f"搜索 personal_memories 失败: {e}")
+            # 并发执行两个搜索
+            wechat_nodes, personal_nodes = await asyncio.gather(
+                search_group("wechat_relationships"),
+                search_group("personal_memories")
+            )
+
+            all_nodes.extend(wechat_nodes)
+            all_nodes.extend(personal_nodes)
 
             if not all_nodes:
                 logger.warning(f"Graphiti高级搜索未找到Entity节点: {query}")
