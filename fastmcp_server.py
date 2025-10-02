@@ -220,18 +220,19 @@ class ChimeraFastMCPServer:
             description=(
                     "这是我（陈宇函）的个人知识库Chimera**简单/标准搜索**工具。"
                     "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
-                    "🔍 **搜索模式（可选）**：\n"
-                    " - 速度模式 (speed=true) ：默认使用embedding语义搜索，速度快\n\n"
+                    "🔍 **搜索模式**：\n"
                     " - 标准模式 (speed=false)：使用LLM判断+embedding搜索的混合策略，准确性高\n"
+                    " - 速度模式 (speed=true) ：快速搜索，使用embedding语义搜索\n\n"
                     "调用时请传入以下参数（字段名区分大小写，必须严格对应）：\n"
                     " - query (字符串，必填)：搜索短语或关键词 包含中英文 方便进行Embedding相似度搜索\n"
                     " - search_results (整数,可选,默认5)：返回的最大搜索结果条数\n"
-                    " - speed (布尔值，可选，默认true)：速度模式开关，true=仅embedding搜索（快），false=混合搜索（准确）\n"
+                    " - speed (布尔值，可选，默认false)：速度模式开关，true=仅embedding搜索（快），false=混合搜索（准确）\n"
                     "**性能建议**：默认使用速度模式, 高准确性时使用标准模式；。\n\n"
                     "示例参数JSON格式：\n"
                     "{\n"
                     "  \"query\": \"计算机视觉图像处理 image processing \",\n"
-                    "  \"search_results\": 5\n"
+                    "  \"search_results\": 5,\n"
+                    "  \"speed\": false"
                     "}"
             )
         )

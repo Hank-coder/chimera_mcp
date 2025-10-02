@@ -17,11 +17,12 @@ class IntentEvaluationPrompt:
         self.confidence_evaluation_template = PromptTemplate(
             input_variables=["user_input", "candidate_paths", "current_date"],
             template="""
-            你是一个极其严谨和注重细节的个人知识库导航助手。你必须遵循一个严格的两阶段评估流程来筛选路径。
+            你是一个极其严谨和注重细节的个人知识库定位助手。
 
-            **第一阶段：内容相关性评估**
-            首先，对“所有可用的完整路径列表”中的每一项进行内容相关性评估，忽略路径中附加的时间戳信息。根据路径的关键词、
-            语义和上下文与“用户查询”的匹配程度，在心中给出一个“初步分数”。
+            **内容相关性评估**
+            请对「所有可用的完整路径列表」中的每一项进行内容相关性评估。
+            评估方式：根据路径的 关键词、语义和上下文 与「用户查询」的 直接或间接匹配程度，给出相关性分数。
+            评分范围：置信度在 0 ~ 1 之间（0 表示完全无关，1 表示高度相关）。
             
             请重点关注：
                 1. 路径中的关键词（特别是叶子节点）是否匹配用户查询
@@ -29,17 +30,6 @@ class IntentEvaluationPrompt:
                 3. 从路径判断最终内容是否能回答用户问题
                 4. 路径的上下文关系是否有助于理解用户意图
     
-            **第二阶段：时间一致性筛选**
-            
-            **当前时间 (UTC)**：
-            {current_date}
-
-            在完成第一阶段后，执行以下时间过滤逻辑：
-            1.  分析“用户查询”：`{user_input}`
-            2.  判断查询中是否包含时间意图（如“最近”、“昨天”、“上周”、“2-4月”、“7月初”）。
-            3. **任何不在时间意图内的路径请给予较低置信度**
-
-            ---
             **用户查询**：
             {user_input}
 
@@ -47,25 +37,22 @@ class IntentEvaluationPrompt:
             {candidate_paths}
             ---
             **输出要求**
-            -   请严格按照以下JSON格式返回。
-            -   **只** 包含最终 `confidence_score` **大于等于 0.8** 的路径
-            -   `reasoning` 必须简洁地解释评估结果，**必须明确提及时间评估的结果**（例如，"时间匹配成功"或"查询无时间要求"）。
+            -   **只** 包含最终 `confidence_score` **大于等于 0.75** 的路径
+            -   最多返回Top10结果
             -   `document_index` 必须对应原始路径列表的准确索引（从0开始）。
             -   `summary`中的`total_candidates`请填写候选路径的总数。
             -   不要添加markdown或其他任何多余的格式。
-
+            -   请严格按照以下JSON格式返回。
             ```json
             {{
                 "evaluations": [
                     {{
                         "document_index": 0,
                         "confidence_score": 0.9,
-                        "reasoning": "内容高度相关，路径的编辑时间符合用户查询'上周'的时间范围，通过时间否决检查。"
                     }},
                     {{
                         "document_index": 5,
                         "confidence_score": 0.8,
-                        "reasoning": "内容相关，用户查询无特定时间要求，跳过时间否决检查。"
                     }}
                 ],
                 "summary": {{

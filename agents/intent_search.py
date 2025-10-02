@@ -73,31 +73,28 @@ class IntentSearchEngine:
 
             # 3. 🆕 根据speed参数选择执行模式
             if search_request.speed:
-                # 速度模式：只使用embedding搜索
+                # 速度模式：只使用embedding搜索（阶梯筛选）
                 embedding_results = await self._google_embedding_search(search_request.intent_keywords)
                 confidence_paths = await self._build_speed_mode_paths(embedding_results, search_request)
             else:
-                # 标准模式：并行执行LLM判断 + embedding搜索
-                candidate_paths_task = self._get_complete_paths()
-                embedding_search_task = self._google_embedding_search(search_request.intent_keywords)
+                # 标准模式：Embedding Top 50 + LLM精评
+                # 1. 获取Top 50 embedding候选
+                embedding_top50 = await self._google_embedding_search_top50(search_request.intent_keywords)
 
-                candidate_paths, embedding_results = await asyncio.gather(
-                    candidate_paths_task,
-                    embedding_search_task
-                )
+                # 2. 用缓存补全完整路径信息
+                candidate_paths = await self._enrich_embedding_results_with_cache(embedding_top50)
 
-                # 保存embedding结果供后续使用
-                self._embedding_results = embedding_results
-
-                # 4. 使用Gemini进行路径置信度评估
+                # 3. LLM评估这些候选
                 confidence_evaluation = await self._evaluate_path_confidence(
                     user_input, candidate_paths
                 )
 
-                # 5. 选择高置信度路径并扩展
+                # 4. 选择高置信度路径并扩展（逻辑不变）
                 confidence_paths = await self._build_confidence_paths(
                     confidence_evaluation, search_request, candidate_paths
                 )
+
+                print(f"标准搜索找到 {len(confidence_paths)} 个结果")
             
             # 6. 构建响应元数据
             processing_time = (time.time() - start_time) * 1000
@@ -148,7 +145,7 @@ class IntentSearchEngine:
         if not keywords:
             keywords = [user_input]
         
-        return keywords[:5]  # 最多5个关键词
+        return keywords[:6]  # 最多6个关键词
     
     
     async def _get_complete_paths(self) -> List[Dict[str, Any]]:
@@ -366,60 +363,20 @@ class IntentSearchEngine:
                 print(f"构建置信度路径时出错: {e}")
                 continue
 
-        # 🆕 智能混合搜索：合并embedding结果
-        final_paths = await self._smart_merge_with_embedding_results(confidence_paths, request)
+        # 直接返回LLM筛选的高置信度路径（Top 30模式下不需要额外合并）
+        # 按max_results限制返回数量
+        if len(confidence_paths) > request.max_results:
+            confidence_paths = confidence_paths[:request.max_results]
 
-        return final_paths
-
-    async def _smart_merge_with_embedding_results(self, llm_paths: List[ConfidencePath], request: IntentSearchRequest) -> List[ConfidencePath]:
-        """混合搜素：LLM结果 + Embedding top3，去重后返回"""
-
-        if not hasattr(self, '_embedding_results') or not self._embedding_results:
-            print("无embedding搜索结果，返回LLM判断结果")
-            return llm_paths
-
-        try:
-
-            # 1. 先添加所有LLM结果
-            final_results = []
-            llm_page_ids = set()
-
-            for path in llm_paths:
-                print(f"LLM判断结果: {path.core_page.title} (置信度: {path.core_page.confidence_score:.4f})")
-                final_results.append(path)
-                llm_page_ids.add(path.core_page.notion_id)
-                path.core_page.search_source = 'llm_judgment'
-
-            # 2. 添加embedding结果（去重）
-            embedding_added = 0
-            for embedding_result in self._embedding_results:
-                page_id = embedding_result['leaf_id']
-                if page_id not in llm_page_ids:  # 去重
-                    embedding_path = await self._create_embedding_confidence_path(embedding_result, request)
-                    if embedding_path:
-                        final_results.append(embedding_path)
-                        embedding_added += 1
-
-            # 3. 应用max_results限制
-            if len(final_results) > request.max_results:
-                # 按置信度排序，取top N
-                final_results.sort(key=lambda x: x.core_page.confidence_score, reverse=True)
-                final_results = final_results[:request.max_results]
-            # print(final_results)
-            return final_results
-
-        except Exception as e:
-            print(f"合并出错: {e}，返回LLM结果")
-            return llm_paths
-
+        return confidence_paths
 
     async def _create_embedding_confidence_path(self, embedding_result: Dict[str, Any], request: IntentSearchRequest) -> ConfidencePath:
-        """将embedding搜索结果转换为ConfidencePath"""
+        """将embedding搜索结果转换为ConfidencePath（速度模式专用）"""
 
         try:
-            page_id = embedding_result['leaf_id']  # 修正：使用leaf_id
-            page_title = embedding_result['leaf_title']  # 修正：使用leaf_title
-            page_url = embedding_result.get('leaf_url', '')  # 修正：使用leaf_url
+            page_id = embedding_result['leaf_id']
+            page_title = embedding_result['leaf_title']
+            page_url = embedding_result.get('leaf_url', '')
             semantic_score = embedding_result['semantic_score']
 
             # 获取页面内容
@@ -442,8 +399,8 @@ class IntentSearchEngine:
                 url=page_url,
                 tags=[],
                 content=page_content,
-                confidence_score=semantic_score,  # 使用语义相似度作为置信度
-                path_string=path_string,  # 使用完整路径信息
+                confidence_score=semantic_score,
+                path_string=path_string,
                 path_titles=path_titles,
                 path_ids=path_ids,
                 last_edited_time=latest_timestamp
@@ -457,12 +414,12 @@ class IntentSearchEngine:
             path_metadata = ConfidencePathMetadata(
                 total_pages=1,
                 confidence_level='high' if semantic_score >= 0.8 else 'medium',
-                expansion_depth=0  # embedding结果不做扩展
+                expansion_depth=0
             )
 
             return ConfidencePath(
                 core_page=core_page,
-                related_pages=[],  # embedding结果不扩展相关页面，保持简洁
+                related_pages=[],
                 path_metadata=path_metadata
             )
 
@@ -653,8 +610,46 @@ class IntentSearchEngine:
             return "低"
 
 
+    async def _google_embedding_search_top50(self, keywords: List[str]) -> List[Dict[str, Any]]:
+        """标准模式专用：返回Top 30语义相似的leaf节点（无阶梯筛选）"""
+
+        embedding_results = []
+
+        try:
+            # 1. 为搜索关键词生成embedding
+            search_text = ' '.join(keywords)
+            search_embedding = await self.embedding_service.get_embedding(search_text)
+
+            if not search_embedding:
+                print("生成搜索embedding失败，跳过embedding搜索")
+                return []
+
+            # 2. 使用embedding搜索服务
+            await self.embedding_search_service.initialize()
+            search_results = await self.embedding_search_service.search_similar_pages(
+                query_text=search_text,
+                limit=30,              # 直接获取Top 30
+                similarity_threshold=0.5  # 保持合理阈值
+            )
+
+            # 3. 转换为统一格式（无阶梯筛选，直接返回所有结果）
+            for result in search_results:
+                embedding_results.append({
+                    'leaf_id': result['notionId'],
+                    'leaf_title': result['title'],
+                    'leaf_url': result.get('url', ''),
+                    'semantic_score': result['score']
+                })
+            # print(embedding_results)
+            # print(f"🔍 标准模式Embedding搜索: 找到 {len(embedding_results)} 个候选（Top 30）")
+
+        except Exception as e:
+            print(f"Embedding Top 50搜索失败: {e}")
+
+        return embedding_results
+
     async def _google_embedding_search(self, keywords: List[str]) -> List[Dict[str, Any]]:
-        """使用Google embedding进行语义搜索"""
+        """速度模式专用：使用阶梯筛选的Google embedding搜索"""
 
         embedding_results = []
 
@@ -725,6 +720,54 @@ class IntentSearchEngine:
 
         return embedding_results
 
+    async def _enrich_embedding_results_with_cache(self, embedding_results: List[Dict]) -> List[Dict[str, Any]]:
+        """将embedding的Top 50结果补全为完整路径信息"""
+
+        from pathlib import Path
+        cache_file = Path("llm_cache/chimera_cache.json")
+
+        if not cache_file.exists():
+            print("⚠️ 缓存文件不存在，无法enrichment")
+            return []
+
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+
+            enriched_paths = []
+
+            for emb_result in embedding_results:
+                leaf_id = emb_result['leaf_id']
+
+                # 从缓存中查找完整路径
+                for path_data in cache_data.get("paths", []):
+                    if path_data["leaf_id"] == leaf_id:
+                        leaf_page = cache_data["pages"].get(leaf_id, {})
+
+                        enriched = {
+                            'path_string': path_data["path_string"],
+                            'path_titles': path_data["path_titles"],
+                            'path_ids': path_data["path_ids"],
+                            'leaf_id': leaf_id,
+                            'leaf_title': path_data["leaf_title"],
+                            'leaf_last_edited_time': leaf_page.get("lastEditedTime", ""),
+                            'leaf_tags': leaf_page.get("tags", []),
+                            'leaf_url': leaf_page.get("url", ""),
+                            'path_length': path_data["path_length"],
+                            'path_type': 'embedding_candidate',
+                            'semantic_score': emb_result['semantic_score'],
+                            'relevance_score': emb_result['semantic_score']  # 兼容性字段
+                        }
+                        enriched_paths.append(enriched)
+                        break
+            #
+            # print(f"✅ 缓存enrichment完成: {len(enriched_paths)}/{len(embedding_results)} 个候选")
+            return enriched_paths
+
+        except Exception as e:
+            print(f"❌ Enrichment失败: {e}")
+            return []
+
     async def _build_speed_mode_paths(self, embedding_results: List[Dict[str, Any]], request: IntentSearchRequest) -> List[ConfidencePath]:
         """
         速度模式：只使用embedding搜索结果构建路径
@@ -736,7 +779,7 @@ class IntentSearchEngine:
         Returns:
             构建的置信度路径列表
         """
-        print(f"⚡ 速度模式：只使用embedding搜索，找到 {len(embedding_results)} 个结果")
+        print(f"速度模式：只使用embedding搜索，找到 {len(embedding_results)} 个结果")
 
         confidence_paths = []
 
