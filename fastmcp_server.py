@@ -218,8 +218,8 @@ class ChimeraFastMCPServer:
         @self.mcp.tool(
             title="个人知识库搜索（Notion）",
             description=(
-                    "这是我（陈宇函）的个人知识库 **Chimera** —— 简单 / 标准搜索工具。"
-                    "用于从第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
+                    "这是我（陈宇函）的个人知识库 **Chimera** —— 检索工具。"
+                    "用于从我的第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
                     "**调用参数**（字段名区分大小写，必须严格对应）：\n"
                     "- query (字符串，必填)：搜索短语或关键词（中英文均可），用于 Embedding 相似度搜索\n"
                     "- search_results (整数, 可选, 默认=5)：返回的最大搜索结果条数 最大为10\n"
@@ -229,6 +229,13 @@ class ChimeraFastMCPServer:
                     "**性能建议**：\n"
                     "- 默认使用速度模式\n"
                     "- 需要高准确性时使用标准模式"
+                    "- 如果调用两次仍然没有结果就返回没找到结果\n"
+                    "**示例参请求格式：**\n"
+                    "{\n"
+                    "  \"query\": \"计算机视觉 image processing\",\n"
+                    "  \"search_results\": 5,\n"
+                    "  \"speed\": false"
+                    "}"
             )
         )
         async def intent_search(params: IntentSearchInput, ctx: Context) -> ChimeraResult:
