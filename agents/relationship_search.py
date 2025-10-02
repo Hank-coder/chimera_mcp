@@ -248,8 +248,8 @@ class WeChatRelationshipSearcher:
             # 按得分排序
             sorted_entities = sorted(formatted_entities, key=lambda x: x.get('score', 0), reverse=True)
 
-            # 过滤掉低分实体 - 最低分数阈值为3.0
-            MIN_SCORE_THRESHOLD = 3.0
+            # 过滤掉低分实体 - 最低分数阈值为1.5
+            MIN_SCORE_THRESHOLD = 1.5
             filtered_entities = [e for e in sorted_entities if e.get('score', 0) >= MIN_SCORE_THRESHOLD]
 
             logger.info(f"找到 {len(filtered_entities)} 个匹配实体")
