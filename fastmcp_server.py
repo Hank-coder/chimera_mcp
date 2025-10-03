@@ -54,9 +54,9 @@ class IntentSearchInput(BaseModel):
     )
 
     search_results: int = Field(
-        3,
+        5,
         description=(
-            "返回的搜索结果数量，默认返回 3 条相关路径。"
+            "返回的搜索结果数量，默认返回 5 条相关路径。"
             "可根据需要调整数量上限。"
         )
     )
@@ -222,7 +222,7 @@ class ChimeraFastMCPServer:
                     "用于从我的第二大脑（Notion）中查找相关笔记、记录、项目、总结等内容。\n\n"
                     "**调用参数**（字段名区分大小写，必须严格对应）：\n"
                     "- query (字符串，必填)：搜索短语或关键词（中英文均可），用于 Embedding 相似度搜索\n"
-                    "- search_results (整数, 可选, 默认=5)：返回的最大搜索结果条数 最大为10\n"
+                    "- search_results (整数, 可选, 默认=5)：返回的最大搜索结果条数，最大为10\n"
                     "- speed (布尔值)：搜索模式开关\n"
                     "  - false：[默认] 使用 LLM 判断 + embedding 搜索的混合策略，准确性高（准）\n\n"
                     "  - true：仅 embedding 搜索（速度快）\n"    

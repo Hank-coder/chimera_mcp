@@ -38,6 +38,7 @@ class IntentEvaluationPrompt:
             ---
             **输出要求**
             -   **只** 包含最终 `confidence_score` **大于等于 0.75** 的路径
+            -   **必须按 `confidence_score` 从高到低排序输出**（最高分在前）
             -   最多返回Top10结果
             -   `document_index` 必须对应原始路径列表的准确索引（从0开始）。
             -   `summary`中的`total_candidates`请填写候选路径的总数。

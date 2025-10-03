@@ -325,13 +325,16 @@ class IntentSearchEngine:
             eval_item for eval_item in evaluation.evaluations
             if self._get_confidence_score(eval_item) >= 0.8
         ]
-        
-        # 按置信度排序，不限制数量（让client的search_results控制）
+
+        # 按置信度排序（LLM已排序，双保险）
         high_confidence_evals.sort(
             key=lambda x: self._get_confidence_score(x),
             reverse=True
         )
-        
+
+        # 应用 max_results 限制，取 top-k
+        high_confidence_evals = high_confidence_evals[:request.max_results]
+
         for eval_item in high_confidence_evals:
             try:
                 # 获取核心页面内容
