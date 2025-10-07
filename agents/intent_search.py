@@ -826,10 +826,10 @@ class IntentSearchEngine:
             max_results: 最大返回结果数
 
         Returns:
-            List[Dict] with keys: id, title, url
+            List[Dict] with keys: title, url
             例如: [
-                {"id": "page-id-1", "title": "页面标题1", "url": "https://..."},
-                {"id": "page-id-2", "title": "页面标题2", "url": "https://..."}
+                {"title": "页面标题1", "url": "https://www.notion.so/22eccc690d828045bdeec4cb511ff833"},
+                {"title": "页面标题2", "url": "https://www.notion.so/..."}
             ]
         """
         try:
@@ -839,10 +839,13 @@ class IntentSearchEngine:
             search_results = []
             if result.success and result.confidence_paths:
                 for path in result.confidence_paths:
+                    # 将notion_id转换为URL格式（移除所有连字符）
+                    notion_id_clean = path.core_page.notion_id.replace('-', '')
+                    url = f"https://www.notion.so/{notion_id_clean}"
+
                     search_results.append({
-                        'id': path.core_page.notion_id,
                         'title': path.core_page.title,
-                        'url': path.core_page.url
+                        'url': url
                     })
 
             print(f"✅ search_only完成，找到 {len(search_results)} 个结果")

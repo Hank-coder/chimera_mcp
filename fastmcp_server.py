@@ -227,8 +227,9 @@ class ChimeraFastMCPServer:
                     "  - false：[默认] 使用 LLM 判断 + embedding 搜索的混合策略，准确性高（准）\n\n"
                     "  - true：仅 embedding 搜索（速度快）\n"    
                     "**性能建议**：\n"
-                    "- 默认使用速度模式\n"
-                    "- 需要高准确性时使用标准模式"
+                    "- 默认使用标准模式\n"
+                    "- 输出附上时url链接以及更新时间 方便追溯"
+                    "- 输出不需要包含置信度"
                     "- 如果调用两次仍然没有结果就返回没找到结果\n"
                     "**示例参请求格式：**\n"
                     "{\n"
@@ -281,12 +282,15 @@ class ChimeraFastMCPServer:
                         if core_page.path_ids and core_page.path_titles:
                             # 为路径中的每个页面创建内容项，核心页面使用已获取的内容
                             for i, (page_id, page_title) in enumerate(zip(core_page.path_ids, core_page.path_titles)):
+                                # 将page_id转换为URL格式（移除连字符）
+                                page_url = f"https://www.notion.so/{page_id.replace('-', '')}"
+
                                 if page_id == core_page.notion_id:
                                     # 这是核心页面，使用已获取的内容
                                     page_content_item = {
                                         "position": i,
                                         "title": page_title,
-                                        "notion_id": page_id,
+                                        "url": page_url,
                                         "content": core_page.content,
                                         "content_length": len(core_page.content),
                                         "last_edited_time": core_page.last_edited_time,
@@ -297,7 +301,7 @@ class ChimeraFastMCPServer:
                                     page_content_item = {
                                         "position": i,
                                         "title": page_title,
-                                        "notion_id": page_id,
+                                        "url": page_url,
                                         "content": f"📄 路径页面: {page_title}",
                                         "content_length": 0,
                                         "last_edited_time": "",
@@ -306,10 +310,13 @@ class ChimeraFastMCPServer:
                                 path_contents.append(page_content_item)
                         else:
                             # 没有完整路径信息，只有核心页面
+                            # 将notion_id转换为URL格式（移除连字符）
+                            core_page_url = f"https://www.notion.so/{core_page.notion_id.replace('-', '')}"
+
                             path_contents = [{
                                 "position": 0,
                                 "title": core_page.title,
-                                "notion_id": core_page.notion_id,
+                                "url": core_page_url,
                                 "content": core_page.content,
                                 "content_length": len(core_page.content),
                                 "last_edited_time": core_page.last_edited_time,
@@ -536,22 +543,13 @@ class ChimeraFastMCPServer:
         # ==================== GPT MCP标准工具 ====================
 
         @self.mcp.tool(
-            title="搜索页面ID（Notion）",
+            title="搜索页面URL（Notion）",
             description=(
-                "GPT MCP标准search工具 - 搜索Notion并返回相关页面ID列表。\n\n"
-                "**功能**：从Notion知识库中搜索相关页面，返回页面ID、标题、URL列表。\n\n"
+                "GPT MCP标准search工具 - 搜索Notion并返回相关页面URL列表。\n\n"
+                "**功能**：从Notion知识库中搜索相关页面，返回页面标题、URL列表。\n\n"
                 "**参数**：\n"
                 "- query (str): 搜索查询字符串\n\n"
-                "**返回格式**：\n"
-                "```json\n"
-                "{\n"
-                "  \"results\": [\n"
-                "    {\"id\": \"page-id-1\", \"title\": \"页面标题1\", \"url\": \"https://...\"},\n"
-                "    {\"id\": \"page-id-2\", \"title\": \"页面标题2\", \"url\": \"https://...\"}\n"
-                "  ]\n"
-                "}\n"
-                "```\n\n"
-                "**使用建议**：先使用此工具获取ID列表，再使用fetch工具按需获取内容。"
+                "**使用建议**：先使用此工具获取URL列表，再使用fetch工具按需获取内容。"
             )
         )
         async def search(query: str, ctx: Context):
@@ -612,30 +610,6 @@ class ChimeraFastMCPServer:
                 "  1. 单个ID: 'page-id-1'\n"
                 "  2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'\n"
                 "  3. JSON数组: '[\"page-id-1\", \"page-id-2\"]'\n\n"
-                "**返回格式**：\n"
-                "```json\n"
-                "{\n"
-                "  \"results\": [\n"
-                "    {\n"
-                "      \"id\": \"leaf-page-id\",\n"
-                "      \"title\": \"叶子页面标题\",\n"
-                "      \"text\": \"叶子页面完整内容...\",\n"
-                "      \"url\": \"https://...\",\n"
-                "      \"metadata\": {\n"
-                "        \"last_edited_time\": \"2024-01-01T00:00:00\",\n"
-                "        \"content_length\": 5000,\n"
-                "        \"path_string\": \"Root -> Parent -> Leaf\",\n"
-                "        \"path_contents\": [\n"
-                "          {\"title\": \"Root\", \"content\": \"...\", \"position\": 0},\n"
-                "          {\"title\": \"Parent\", \"content\": \"...\", \"position\": 1},\n"
-                "          {\"title\": \"Leaf\", \"content\": \"...\", \"position\": 2, \"is_leaf\": true}\n"
-                "        ],\n"
-                "        \"total_path_pages\": 3\n"
-                "      }\n"
-                "    }\n"
-                "  ]\n"
-                "}\n"
-                "```\n\n"
                 "**特性**：\n"
                 "- 自动获取完整路径上所有页面的内容\n"
                 "- text字段为叶子页面主内容\n"

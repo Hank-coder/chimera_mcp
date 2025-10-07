@@ -429,7 +429,6 @@ class SearchToolInput(BaseModel):
 
 class SearchResultItem(BaseModel):
     """单个搜索结果项"""
-    id: str = Field(..., description="Notion页面ID")
     title: str = Field(..., description="页面标题")
     url: str = Field(..., description="页面URL")
 
