@@ -728,6 +728,7 @@ class ChimeraFastMCPServer:
                 "**注意**："
                 "-必须把今天 昨天等日期转化为准确的时间 （年月日 时分秒）"
                 "-Content要有总结性，简洁方便知识图谱构造就行, 最多字数为150字"
+                "-返回 *success: true* 表示储存成功 代表完成工具调用"
             )
         )
         async def write_personal_memory_tool(params: PersonalMemoryInput, ctx: Context) -> ChimeraResult:

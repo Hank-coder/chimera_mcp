@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Neo4j数据同步脚本
-将本地Neo4j数据同步到云服务器
-保证两边数据同步
+将本地Neo4j数据同步到云服务器数据库
+保证两边数据同步 (注意会删除target数据库信息）
 运行
 python scripts/neo4j_sync.py sync --clear-target --source-uri neo4j://127.0.0.1:7687 --target-uri neo4j://117.72.96.19:7687 --username neo4j --password 1qw23er4
 """
