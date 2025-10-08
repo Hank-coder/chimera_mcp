@@ -457,7 +457,8 @@ class ChimeraFastMCPServer:
                     "- `max_pages` (int): 处理的页面数量（根据需要选择 5-20）。\n"
                     "- `research_complexity` (str): 研究复杂度，控制分析深度与风格,"
                     "可选：overview|standard|detailed|comprehensive"
-
+                    
+                    "注意: 如果用户输入Notion url需要提取page_id请求"
                     "**🧪 示例**：\n"
                     "用户提出请求：`请对「page_id」这个页面做一次深度搜索，用于后续代码生成支持。`\n\n"
                     "调用方式：\n"
