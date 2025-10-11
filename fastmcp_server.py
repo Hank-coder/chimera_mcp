@@ -28,12 +28,6 @@ from agents.relationship_search import search_wechat_relationships
 from agents.personal_memory_writer import write_personal_memory
 from core.models import (
     DeepResearchRequest,
-    SearchToolInput,
-    SearchToolResponse,
-    SearchResultItem,
-    FetchToolInput,
-    FetchToolResponse,
-    FetchResultItem,
     PersonalMemoryInput,
     PersonalMemoryResponse
 )
@@ -179,38 +173,6 @@ class ChimeraFastMCPServer:
         except Exception as e:
             logger.warning(f"Bearer认证失败：{str(e)}")
             return False
-
-    def _parse_page_ids(self, page_id_str: str) -> List[str]:
-        """
-        解析page_id字符串为ID列表
-
-        支持三种格式：
-        1. 单个ID: 'page-id-1'
-        2. 逗号分隔: 'page-id-1,page-id-2,page-id-3'
-        3. JSON数组: '["page-id-1", "page-id-2"]'
-        """
-        try:
-            page_id_str = page_id_str.strip()
-
-            # 情况1: JSON数组格式
-            if page_id_str.startswith('[') and page_id_str.endswith(']'):
-                try:
-                    page_ids = json.loads(page_id_str)
-                    if isinstance(page_ids, list):
-                        return [str(pid).strip() for pid in page_ids if pid]
-                except json.JSONDecodeError:
-                    pass
-
-            # 情况2: 逗号分隔格式
-            if ',' in page_id_str:
-                return [pid.strip() for pid in page_id_str.split(',') if pid.strip()]
-
-            # 情况3: 单个ID
-            return [page_id_str] if page_id_str else []
-
-        except Exception as e:
-            logger.error(f"解析page_id失败: {e}")
-            return []
 
     def _setup_tools(self):
         """设置MCP工具"""
@@ -539,7 +501,6 @@ class ChimeraFastMCPServer:
                     data={"research_context": None},
                     message=f"深度研究失败: {str(e)}"
                 )
-
 
         # ==================== 个人记忆写入工具 ====================
 
